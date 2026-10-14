@@ -3,23 +3,43 @@ import { siteData } from '../siteData';
 import { Icon } from './Icons';
 
 export function SmartIrrigation() {
-  const { badge, title, subtitle, flowSteps, gauge, explanationSteps } = siteData.smartIrrigation;
-  
-  // Interactive gauge toggle / slider demo
-  const [moistureLevel, setMoistureLevel] = useState(gauge.current);
+  const { irrigation } = siteData;
 
-  // SVG Gauge calculations
-  const radius = 90;
-  const circumference = 2 * Math.PI * radius;
-  const strokeDashoffset = circumference - (moistureLevel / 100) * circumference;
+  const [sectors, setSectors] = useState(irrigation.sectors);
+  const [activeSectorId, setActiveSectorId] = useState('sec-2');
+  const [valveToggling, setValveToggling] = useState(false);
+  const [actionNotice, setActionNotice] = useState('');
 
-  const getMoistureStatus = (val) => {
-    if (val < 35) return { text: 'Water Stress • Valve Triggered', color: '#ef4444' };
-    if (val > 70) return { text: 'Saturated • Valve Off', color: '#3b82f6' };
-    return { text: 'Optimal Hydration', color: '#16a34a' };
+  const activeSector = sectors.find((s) => s.id === activeSectorId) || sectors[0];
+
+  // Manual valve toggle simulation
+  const handleToggleValve = (sectorId) => {
+    setValveToggling(true);
+    setActionNotice('');
+
+    setTimeout(() => {
+      setSectors((prev) =>
+        prev.map((s) => {
+          if (s.id === sectorId) {
+            const nextStatus = s.valveStatus === 'Active' ? 'Closed' : 'Active';
+            const nextFlow = nextStatus === 'Active' ? '15.4 L/min' : '0 L/min';
+            return {
+              ...s,
+              valveStatus: nextStatus,
+              flowRate: nextFlow,
+              lastIrrigated: nextStatus === 'Active' ? 'Just now (Manual Trigger)' : s.lastIrrigated
+            };
+          }
+          return s;
+        })
+      );
+
+      setValveToggling(false);
+      setActionNotice(
+        'Solenoid actuator signal dispatched to ESP32 relay controller.'
+      );
+    }, 500);
   };
-
-  const currentStatus = getMoistureStatus(moistureLevel);
 
   return (
     <section id="irrigation" className="section irrigation-section">
@@ -28,112 +48,223 @@ export function SmartIrrigation() {
         <div className="section-header">
           <div className="badge">
             <span className="badge-dot" />
-            {badge}
+            Precision Smart Irrigation
           </div>
-          <h2 className="section-title">{title}</h2>
-          <p className="section-subtitle">{subtitle}</p>
+          <h2 className="section-title">
+            Multi-Depth Soil Hydration & Closed-Loop Drip
+          </h2>
+          <p className="section-subtitle">
+            Multi-depth capacitive telemetry tracking volumetric water content at 10cm, 30cm, and 60cm to eliminate root asphyxiation and leaching.
+          </p>
         </div>
 
-        {/* Visual Flow Diagram: Sensor -> Controller -> Valve -> Irrigation */}
-        <div className="irrigation-flow-container">
-          <div className="flow-title">Autonomous Closed-Loop Control Flow</div>
-
-          <div className="flow-steps-grid">
-            {flowSteps.map((step, idx) => (
-              <React.Fragment key={step.step}>
-                <div className="flow-step-card">
-                  <div className="flow-step-badge">0{step.step}</div>
-                  <div className="flow-step-icon">
-                    <Icon name={step.icon} size={24} color="#16a34a" />
-                  </div>
-                  <h4>{step.title}</h4>
-                  <p>{step.desc}</p>
-                </div>
-
-                {/* Arrow connector between cards (not on last card) */}
-                {idx < flowSteps.length - 1 && (
-                  <div className="flow-arrow-indicator" aria-hidden="true">
-                    <Icon name="arrow-right" size={14} color="#16a34a" />
-                  </div>
-                )}
-              </React.Fragment>
-            ))}
+        {/* Telemetry Hardware Mode Notice */}
+        <div className="telemetry-banner-notice">
+          <div className="telemetry-badge-pulse">
+            <span className="live-dot" />
+            <span>
+              <strong>Hardware Telemetry Status:</strong>{' '}
+              Sensor Telemetry Ready (Simulation Mode • ESP32 LoRaWAN Gateway Compatible)
+            </span>
           </div>
+          <span className="last-sync-time">
+            Sub-inch telemetry synced every 60s
+          </span>
         </div>
 
-        {/* Two-Column Details: Circular SVG Gauge (Left) + 4-Step Explanation (Right) */}
-        <div className="irrigation-details-grid">
-          {/* Circular SVG Moisture Gauge */}
-          <div className="gauge-card">
-            <h3 style={{ fontSize: '1.2rem', fontWeight: 800, marginBottom: '20px', color: 'var(--color-text)' }}>
-              Live Root-Zone Moisture Gauge
-            </h3>
+        {/* Sector Tabs Bar */}
+        <div className="sector-tabs-row">
+          {sectors.map((s) => (
+            <button
+              key={s.id}
+              type="button"
+              className={`sector-tab-btn ${activeSector.id === s.id ? 'active' : ''}`}
+              onClick={() => {
+                setActiveSectorId(s.id);
+                setActionNotice('');
+              }}
+            >
+              <div className="sec-tab-top">
+                <span className="sec-tab-name">{s.name}</span>
+                <span className={`valve-pill ${s.valveStatus === 'Active' ? 'open' : 'closed'}`}>
+                  {s.valveStatus === 'Active' ? 'Valve OPEN' : 'CLOSED'}
+                </span>
+              </div>
+              <div className="sec-tab-sub">
+                <span>{s.crop}</span> • <span>Moisture: {s.moisture30cm}%</span>
+              </div>
+            </button>
+          ))}
+        </div>
 
-            <div className="svg-gauge-wrap">
-              <svg className="svg-gauge" viewBox="0 0 220 220">
-                {/* Background Ring */}
-                <circle
-                  className="gauge-bg-circle"
-                  cx="110"
-                  cy="110"
-                  r={radius}
-                />
-                {/* Colored Fill Arc */}
-                <circle
-                  className="gauge-fill-circle"
-                  cx="110"
-                  cy="110"
-                  r={radius}
-                  strokeDasharray={circumference}
-                  strokeDashoffset={strokeDashoffset}
-                  stroke={currentStatus.color}
-                />
-              </svg>
+        {/* Sector In-Depth Telemetry Display */}
+        <div className="irrigation-main-grid">
+          {/* Left Column: 3 Depth Soil Probes Display */}
+          <div className="probes-card">
+            <div className="probes-header">
+              <div className="probe-title-col">
+                <Icon name="layers" size={20} color="#0284c7" />
+                <h3>{activeSector.name}</h3>
+              </div>
+              <span className="crop-type-badge">{activeSector.crop}</span>
+            </div>
 
-              <div className="gauge-center-content">
-                <div className="gauge-pct">{moistureLevel}%</div>
-                <div className="gauge-pct-sub">VWC Ratio</div>
+            <p className="probes-desc">
+              Capacitive wireless telemetry probe tracking volumetric moisture gradient across critical root strata.
+            </p>
+
+            {/* 3 Probe Depths */}
+            <div className="depth-gauges-list">
+              {/* Depth 1: 10cm Topsoil */}
+              <div className="depth-gauge-item">
+                <div className="depth-info-row">
+                  <span className="depth-label">
+                    <Icon name="droplet" size={16} color="#0284c7" />
+                    Topsoil Strata (10cm)
+                  </span>
+                  <strong className="depth-val">{activeSector.moisture10cm}% VWC</strong>
+                </div>
+                <div className="depth-progress-track">
+                  <div
+                    className={`depth-progress-fill ${activeSector.moisture10cm < 35 ? 'low' : 'good'}`}
+                    style={{ width: `${activeSector.moisture10cm}%` }}
+                  />
+                </div>
+                <span className="depth-sub">Evaporation-sensitive surface boundary</span>
+              </div>
+
+              {/* Depth 2: 30cm Active Root Zone */}
+              <div className="depth-gauge-item active-root">
+                <div className="depth-info-row">
+                  <span className="depth-label">
+                    <Icon name="sprout" size={16} color="#16a34a" />
+                    <strong>Active Root Zone (30cm)</strong>
+                  </span>
+                  <strong className="depth-val text-green">{activeSector.moisture30cm}% VWC</strong>
+                </div>
+                <div className="depth-progress-track">
+                  <div
+                    className={`depth-progress-fill ${activeSector.moisture30cm < 35 ? 'low' : 'optimal'}`}
+                    style={{ width: `${activeSector.moisture30cm}%` }}
+                  />
+                </div>
+                <span className="depth-sub">
+                  {activeSector.moisture30cm < 35
+                    ? 'Warning: Below wilting threshold. Irrigation recommended.'
+                    : 'Optimal physiological uptake maintained.'}
+                </span>
+              </div>
+
+              {/* Depth 3: 60cm Subsoil Reserve */}
+              <div className="depth-gauge-item">
+                <div className="depth-info-row">
+                  <span className="depth-label">
+                    <Icon name="layers" size={16} color="#64748b" />
+                    Subsoil Deep Reserve (60cm)
+                  </span>
+                  <strong className="depth-val">{activeSector.moisture60cm}% VWC</strong>
+                </div>
+                <div className="depth-progress-track">
+                  <div
+                    className="depth-progress-fill deep"
+                    style={{ width: `${activeSector.moisture60cm}%` }}
+                  />
+                </div>
+                <span className="depth-sub">Deep moisture reserve; zero drainage loss</span>
               </div>
             </div>
 
-            <div className="gauge-status-pill" style={{ color: currentStatus.color }}>
-              <span className="badge-dot" style={{ backgroundColor: currentStatus.color, boxShadow: `0 0 8px ${currentStatus.color}` }} />
-              {currentStatus.text}
-            </div>
-
-            <div className="gauge-substatus" style={{ marginBottom: '16px' }}>
-              {gauge.substatus}
-            </div>
-
-            {/* Interactive Moisture Slider to test gauge */}
-            <div style={{ marginTop: '16px', borderTop: '1px solid var(--color-border)', paddingTop: '16px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: 'var(--color-muted)', marginBottom: '6px' }}>
-                <span>Simulate Sensor Value:</span>
-                <strong>{moistureLevel}%</strong>
-              </div>
-              <input
-                type="range"
-                min="15"
-                max="90"
-                value={moistureLevel}
-                onChange={(e) => setMoistureLevel(Number(e.target.value))}
-                style={{ width: '100%', accentColor: 'var(--color-primary)', cursor: 'pointer' }}
-                aria-label="Simulate moisture gauge value"
-              />
-            </div>
-          </div>
-
-          {/* 4-Step Numbered Explanation */}
-          <div className="explanation-list">
-            {explanationSteps.map((step) => (
-              <div key={step.number} className="explanation-item">
-                <div className="step-num-bubble">{step.number}</div>
-                <div className="explanation-body">
-                  <h4>{step.title}</h4>
-                  <p>{step.description}</p>
+            {/* Solenoid Valve Control Box */}
+            <div className="valve-control-box">
+              <div className="valve-status-info">
+                <div className="v-icon-wrap">
+                  <Icon name="valve" size={24} color={activeSector.valveStatus === 'Active' ? '#16a34a' : '#64748b'} />
+                </div>
+                <div>
+                  <h4>Solenoid Actuator State:</h4>
+                  <span className="valve-current">
+                    {activeSector.valveStatus === 'Active'
+                      ? `OPEN • Flowing at ${activeSector.flowRate}`
+                      : 'CLOSED • Standby'}
+                  </span>
                 </div>
               </div>
-            ))}
+
+              <button
+                type="button"
+                className={`btn ${activeSector.valveStatus === 'Active' ? 'btn-outline' : 'btn-primary'}`}
+                onClick={() => handleToggleValve(activeSector.id)}
+                disabled={valveToggling}
+              >
+                <Icon name={activeSector.valveStatus === 'Active' ? 'square' : 'play'} size={16} />
+                <span>
+                  {valveToggling
+                    ? 'Dispatching Signal...'
+                    : activeSector.valveStatus === 'Active'
+                    ? 'Close Solenoid Valve'
+                    : 'Open Solenoid Valve'}
+                </span>
+              </button>
+            </div>
+
+            {actionNotice && (
+              <div className="success-alert-box" style={{ marginTop: '12px' }}>
+                <Icon name="check" size={16} />
+                <span>{actionNotice}</span>
+              </div>
+            )}
+          </div>
+
+          {/* Right Column: Crop Water Needs Table & Agronomy Schedule */}
+          <div className="irrigation-guide-card">
+            <div className="guide-header">
+              <Icon name="droplets" size={20} color="#0284c7" />
+              <h3>Crop Water Requirements & Micro-Drip Schedule</h3>
+            </div>
+
+            <p className="guide-sub">
+              Daily evapotranspiration (ETc) calibrations based on standardized FAO-56 Penman-Monteith formulas.
+            </p>
+
+            <div className="water-needs-table-wrap">
+              <table className="water-table">
+                <thead>
+                  <tr>
+                    <th>Crop</th>
+                    <th>Daily Need (mm/day)</th>
+                    <th>Recommended Method</th>
+                    <th>Critical Moisture Stage</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {irrigation.cropWaterNeeds.map((item, idx) => (
+                    <tr key={idx} className={item.crop.includes(activeSector.crop) ? 'highlight-row' : ''}>
+                      <td>
+                        <strong>{item.crop}</strong>
+                      </td>
+                      <td>
+                        <span className="mm-pill">{item.mmPerDay}</span>
+                      </td>
+                      <td>{item.method}</td>
+                      <td>
+                        <span className="stage-note">{item.criticalStage}</span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Smart Irrigation Advice Box */}
+            <div className="irrigation-advisory-box">
+              <h4>
+                <Icon name="sprout" size={16} color="#16a34a" />
+                Daily Agronomic Water Advisory
+              </h4>
+              <p>
+                Scheduling micro-irrigation between 05:00 AM and 08:00 AM reduces evaporative canopy losses by 28%. Maintain steady furrow moisture for Solanaceae to avoid blossom rot.
+              </p>
+            </div>
           </div>
         </div>
       </div>

@@ -1,551 +1,355 @@
+// AgroVision - Master Site Data
+// Professional English Only
+
 export const siteData = {
   brand: {
-    name: "SmartFarm",
-    tagline: "Precision Agriculture & AI Farming Intelligence",
-    description: "Next-generation precision agriculture platform. Empowering growers with IoT soil telemetry, autonomous irrigation, and edge AI crop diagnostics to maximize harvest yield while preserving water and soil vitality."
+    name: "AgroVision",
+    fullName: "AgroVision – Smart Farming and AI-Based Detection System",
+    tagline: "Smart Farming, Safer Crops",
+    subheading: "Empowering farmers with AI-assisted crop health monitoring, wildlife threat identification, and intelligent farming insights.",
+    description: "Next-generation precision agriculture platform. Integrating edge AI foliage diagnostics, non-invasive wildlife detection alerts, IoT soil telemetry, and hyper-local agronomy to secure farm yields and livelihoods."
   },
 
-  navLinks: [
-    { name: "Home", href: "#home" },
-    { name: "About", href: "#about" },
-    { name: "Features", href: "#features" },
-    { name: "Dashboard", href: "#dashboard" },
-    { name: "Smart Irrigation", href: "#irrigation" },
-    { name: "AI Crop Health", href: "#crop-health" },
-    { name: "Sustainability", href: "#sustainability" },
-    { name: "How It Works", href: "#how-it-works" },
-    { name: "Contact", href: "#contact" }
+  // Navigation Items required by specification
+  navItems: [
+    { id: "home", label: "Home", href: "#home" },
+    { id: "dashboard", label: "Dashboard", href: "#dashboard" },
+    { id: "crop-disease", label: "Crop Disease Detection", href: "#crop-disease" },
+    { id: "wildlife", label: "Wildlife Detection", href: "#wildlife" },
+    { id: "irrigation", label: "Smart Irrigation", href: "#irrigation" },
+    { id: "weather", label: "Weather", href: "#weather" },
+    { id: "crop-care", label: "Crop Care", href: "#crop-care" },
+    { id: "history", label: "Detection History", href: "#history" },
+    { id: "reports", label: "Reports", href: "#reports" },
+    { id: "about", label: "About", href: "#about" }
   ],
 
+  // Hero Section
   hero: {
-    badge: "Next-Gen Agricultural Intelligence",
-    headline: "Transforming Agriculture with AI & Precision IoT",
-    subheadline: "Empower your farm with real-time soil intelligence, autonomous micro-irrigation, and predictive crop analytics to maximize harvests and slash resource waste.",
-    ctaPrimary: { text: "Explore Live Dashboard", href: "#dashboard" },
-    ctaSecondary: { text: "Request Farm Demo", href: "#contact" },
+    badge: "Smart India Hackathon • Agricultural Innovation",
+    headline: "AgroVision – Smart Farming, Safer Crops",
+    subheadline: "Empowering farmers with AI-assisted crop health monitoring, wildlife threat identification, and intelligent farming insights.",
+    ctaDashboard: "Explore Dashboard",
+    ctaCrop: "Crop Disease Detection",
+    ctaWildlife: "Wildlife Detection",
     stats: [
-      { id: "water", target: 45, suffix: "%", label: "Water Saved", desc: "Closed-loop micro-drip scheduling" },
-      { id: "yield", target: 32, suffix: "%", label: "Higher Yield", desc: "Optimal nutrient & root hydration" },
-      { id: "pesticide", target: 55, suffix: "%", label: "Less Pesticide", desc: "Localized early pest eradication" },
-      { id: "farmers", target: 12500, suffix: "+", label: "Farmers Helped", desc: "Active across 28 global agricultural zones" }
+      { id: "scans", target: 4850, suffix: "+", label: "Crop Scans Processed" },
+      { id: "wildlifeAlerts", target: 1240, suffix: "+", label: "Wildlife Alerts Logged" },
+      { id: "waterSavings", target: 42, suffix: "%", label: "Estimated Water Saved" },
+      { id: "farmersAssisted", target: 820, suffix: "+", label: "Farmers Assisted" }
     ]
   },
 
-  about: {
-    badge: "Intelligent Agronomy",
-    title: "Pioneering the Next Era of Sustainable Farming",
-    subtitle: "SmartFarm bridges rugged field IoT hardware with predictive agronomy AI models to eliminate guesswork and safeguard farm profitability.",
-    description: "Our autonomous system acts as a digital agronomist on duty 24/7. By measuring microclimate variations, root-zone hydration, and foliage chlorophyll in real time, farmers achieve unprecedented yield consistency while dramatically slashing input overhead.",
-    checklist: [
-      "Sub-inch precision sensor telemetry updated every 60 seconds",
-      "Predictive irrigation schedules calibrated against hyper-local weather models",
-      "Edge AI disease and pest detection with instant smartphone triage",
-      "Seamless integration with existing drip, pivot, and solenoid valve infrastructure",
-      "Offline edge gateway operation with automated satellite cloud sync in remote zones"
-    ],
-    cards: [
-      {
-        icon: "brain",
-        title: "AI Crop Analytics",
-        badge: "Deep Learning",
-        description: "Continuous neural models predict yield trends, detect canopy stress before visible wilting, and calculate harvest timing with 94%+ precision."
-      },
-      {
-        icon: "sensor",
-        title: "IoT Sensor Probes",
-        badge: "Industrial Telemetry",
-        description: "Multi-depth wireless probes measure volumetric water content, electrical conductivity, soil salinity, and root temperature across all sectors."
-      },
-      {
-        icon: "droplet",
-        title: "Smart Irrigation",
-        badge: "Autonomous Valves",
-        description: "Zero-waste micro-actuators deliver water in calibrated micro-bursts based on real-time evapotranspiration, eliminating dry spots and leaching."
-      }
-    ]
-  },
-
-  features: [
+  // Agricultural Workflow Steps
+  workflow: [
     {
-      id: "crop-monitoring",
-      icon: "eye",
-      title: "AI Crop Monitoring",
-      description: "Computer vision and multispectral canopy scans detect stress, chlorophyll deficiency, and uneven growth days before human eyes can notice.",
-      tag: "Computer Vision"
+      step: "01",
+      icon: "camera",
+      title: "Field Capture & Scouting",
+      desc: "Farmers capture crop foliage photographs or monitor live camera boundary feeds for wildlife incursions."
     },
     {
-      id: "smart-irrigation",
-      icon: "droplets",
-      title: "Smart Irrigation",
-      description: "Automated solenoid valves adjust water delivery dynamically based on real-time transpiration, soil tension, and solar radiation.",
-      tag: "Autonomous"
-    },
-    {
-      id: "soil-moisture",
-      icon: "layers",
-      title: "Soil Moisture Monitoring",
-      description: "Multi-depth capacitive probes track root moisture gradients at 10cm, 30cm, and 60cm to eliminate both leaching and water stress.",
-      tag: "Real-Time Telemetry"
-    },
-    {
-      id: "weather-monitoring",
-      icon: "cloud-sun",
-      title: "Weather Monitoring",
-      description: "Hyper-local micro-weather stations deliver 72-hour frost alerts, vapor-pressure deficit tracking, and wind-drift protection for spraying.",
-      tag: "Hyper-Local Radar"
-    },
-    {
-      id: "disease-detection",
-      icon: "shield-alert",
-      title: "Crop Disease Detection",
-      description: "Instant pathogen recognition identifies blights, rusts, mildews, and viral strains directly on farm handhelds within seconds.",
-      tag: "Edge AI Diagnosis"
-    },
-    {
-      id: "pest-detection",
-      icon: "bug",
-      title: "Pest Detection",
-      description: "Smart optical and acoustic traps catalog invasive insect species early to allow ultra-targeted biological controls before infestation.",
-      tag: "Biosecurity"
-    },
-    {
-      id: "automated-farming",
+      step: "02",
       icon: "cpu",
-      title: "Automated Farming",
-      description: "Plug-and-play controllers seamlessly trigger fertigation injectors, center pivots, greenhouse fans, and autonomous drone missions.",
-      tag: "Robotic Control"
+      title: "Edge AI Diagnosis",
+      desc: "Computer vision classifiers assess foliar symptoms while YOLO object detection identifies animal species."
     },
     {
-      id: "yield-prediction",
-      icon: "trending-up",
-      title: "Yield Prediction",
-      description: "Machine learning models fuse historical weather, soil health indices, and current biomass to forecast seasonal bushel yields accurately.",
-      tag: "ML Forecasting"
+      step: "03",
+      icon: "volume-2",
+      title: "Mild Non-Startling Alert",
+      desc: "A gentle two-tone harmonic chime sounds upon animal detection, notifying operators without panic."
+    },
+    {
+      step: "04",
+      icon: "droplet",
+      title: "Automated Agronomy & Water",
+      desc: "Multi-depth root moisture telemetry guides calibrated drip delivery and sustainable crop care practices."
     }
   ],
 
-  dashboardInitial: {
-    sensors: [
-      {
-        id: "temp",
-        name: "Ambient Temperature",
-        icon: "thermometer",
-        value: 26.4,
-        unit: "°C",
-        min: 10,
-        max: 45,
-        percentage: 58,
-        status: "Optimal",
-        statusType: "success",
-        trend: "+0.8°C vs yesterday",
-        color: "#16a34a"
-      },
-      {
-        id: "humidity",
-        name: "Relative Humidity",
-        icon: "cloud-rain",
-        value: 68,
-        unit: "%",
-        min: 20,
-        max: 100,
-        percentage: 68,
-        status: "Normal",
-        statusType: "success",
-        trend: "Healthy transpiration",
-        color: "#22c55e"
-      },
-      {
-        id: "moisture",
-        name: "Soil Moisture (Zone B)",
-        icon: "droplet",
-        value: 42,
-        unit: "%",
-        min: 0,
-        max: 100,
-        percentage: 42,
-        status: "Good",
-        statusType: "success",
-        trend: "Within field capacity",
-        color: "#3b82f6"
-      },
-      {
-        id: "rainfall",
-        name: "Precipitation (24h)",
-        icon: "cloud-drizzle",
-        value: 14.2,
-        unit: "mm",
-        min: 0,
-        max: 50,
-        percentage: 35,
-        status: "Moderate",
-        statusType: "info",
-        trend: "Shower ended 2h ago",
-        color: "#06b6d4"
-      },
-      {
-        id: "crop-health",
-        name: "Crop Health Index (NDVI)",
-        icon: "sprout",
-        value: 96,
-        unit: "%",
-        min: 0,
-        max: 100,
-        percentage: 96,
-        status: "Excellent",
-        statusType: "success",
-        trend: "Vibrant chlorophyll density",
-        color: "#10b981"
-      },
-      {
-        id: "water-level",
-        name: "Reservoir Water Level",
-        icon: "gauge",
-        value: 84,
-        unit: "%",
-        min: 0,
-        max: 100,
-        percentage: 84,
-        status: "Sufficient",
-        statusType: "success",
-        trend: "14 days reserve capacity",
-        color: "#6366f1"
-      }
-    ],
-    weather: {
-      location: "North Orchard • Sector 4B",
-      condition: "Clear & Sunny",
-      temp: "27°C",
-      feelsLike: "28°C",
-      wind: "8.5 km/h NW",
-      uvIndex: "6.4 High",
-      pressure: "1014 hPa",
-      sunrise: "06:14 AM",
-      sunset: "07:42 PM",
-      dewPoint: "16°C"
+  // Platform Benefits
+  benefits: [
+    {
+      icon: "shield",
+      title: "Safe Wildlife Coexistence",
+      desc: "Non-lethal perimeter alerts prevent conflict with wild boars, elephants, and deer without endangering animals or humans."
     },
-    weeklyMoisture: [
-      { day: "Mon", value: 48, status: "Optimal" },
-      { day: "Tue", value: 41, status: "Moderate" },
-      { day: "Wed", value: 58, status: "Irrigated" },
-      { day: "Thu", value: 52, status: "Optimal" },
-      { day: "Fri", value: 44, status: "Optimal" },
-      { day: "Sat", value: 39, status: "Moderate" },
-      { day: "Sun", value: 47, status: "Optimal" }
-    ]
-  },
-
-  smartIrrigation: {
-    badge: "Autonomous Precision Flow",
-    title: "Closed-Loop Micro-Irrigation Architecture",
-    subtitle: "From underground dielectric sensing to instant cloud computation and localized solenoid valve pulsing — zero water wasted.",
-    flowSteps: [
-      {
-        step: 1,
-        title: "Dielectric Sensor",
-        subtitle: "Sub-surface root probing",
-        desc: "Capacitive probes gauge soil dielectric constant every 60s at multiple depths.",
-        icon: "probe"
-      },
-      {
-        step: 2,
-        title: "AI Controller",
-        subtitle: "Agronomic edge processing",
-        desc: "Neural engine compares transpiration rates and solar radiation against plant stage.",
-        icon: "cpu"
-      },
-      {
-        step: 3,
-        title: "Smart Valve",
-        subtitle: "Solar solenoid actuation",
-        desc: "Wireless pulse-actuated micro-valves open for milliliter-accurate water delivery.",
-        icon: "valve"
-      },
-      {
-        step: 4,
-        title: "Drip Irrigation",
-        subtitle: "Targeted root absorption",
-        desc: "Pressure-compensating emitters deliver water directly into the root rhizosphere.",
-        icon: "sprinkler"
-      }
-    ],
-    gauge: {
-      title: "Current Sector Moisture",
-      current: 58,
-      target: 62,
-      min: 0,
-      max: 100,
-      status: "Optimal Hydration",
-      substatus: "Next micro-pulse scheduled in 3h 15m"
+    {
+      icon: "leaf",
+      title: "Early Foliar Disease Intervention",
+      desc: "Detect fungal blights and bacterial rusts before systemic crop spread, reducing chemical pesticide dependency."
     },
-    explanationSteps: [
-      {
-        number: "01",
-        title: "Continuous Root-Zone Telemetry",
-        description: "Multi-depth capacitive sensors measure soil moisture tension and volumetric water content 24 hours a day, preventing invisible root desiccation."
-      },
-      {
-        number: "02",
-        title: "Hyper-Local Weather Fusion",
-        description: "The AI gateway continuously models local Doppler radar, vapor-pressure deficit (VPD), and solar radiation to cancel watering if precipitation is imminent."
-      },
-      {
-        number: "03",
-        title: "Precision Micro-Pulse Actuation",
-        description: "Instead of inefficient soil-flooding, solar-powered LoRaWAN solenoid valves release micro-bursts of water, preventing nutrient runoff and evaporative loss."
-      },
-      {
-        number: "04",
-        title: "Closed-Loop Feedback Verification",
-        description: "Sensors verify actual root absorption within 10 minutes of delivery, dynamically calibrating the next cycle and conserving up to 45% freshwater."
-      }
-    ]
-  },
-
-  aiCropHealth: {
-    badge: "Edge Vision Diagnostics",
-    title: "AI-Powered Foliage & Disease Detection",
-    subtitle: "Point your smartphone or fly an agricultural drone over your fields. Our edge neural vision instantly identifies over 140 plant pathogens, blights, and deficiencies with laboratory accuracy.",
-    stats: [
-      { label: "Diagnostic Accuracy", value: "98.4%", desc: "Agronomist verified" },
-      { label: "Inference Time", value: "1.2s", desc: "Real-time edge neural inference" },
-      { label: "Diseases Cataloged", value: "140+", desc: "Cereals, fruits, legumes & vines" },
-      { label: "Active Field Monitoring", value: "24/7", desc: "Continuous automated scanning" }
-    ],
-    sampleDetections: [
-      {
-        id: "healthy",
-        crop: "Maize / Sweet Corn",
-        condition: "Healthy Foliage",
-        confidence: "99.4%",
-        status: "Healthy",
-        severity: "None",
-        nitrogenLevel: "Optimal (3.8%)",
-        treatment: "No intervention needed. Foliage displays robust chlorophyll saturation and cellular turgor.",
-        timestamp: "Live Scan • 1.2s ago"
-      },
-      {
-        id: "rust",
-        crop: "Winter Wheat",
-        condition: "Early Leaf Rust (Puccinia)",
-        confidence: "97.8%",
-        status: "Early Stage",
-        severity: "Moderate",
-        nitrogenLevel: "Adequate (3.2%)",
-        treatment: "Targeted triazole bio-fungicide recommended within 36 hours before spore dispersal.",
-        timestamp: "Detected in Sector 2"
-      }
-    ],
-    detectableDiseases: [
-      { name: "Powdery Mildew (Erysiphe)", type: "Fungal", confidence: "99.1%", risk: "High", icon: "fungus" },
-      { name: "Early Blight (Alternaria solani)", type: "Bacterial", confidence: "98.2%", risk: "Moderate", icon: "leaf" },
-      { name: "Corn Leaf Blight (Exserohilum)", type: "Fungal", confidence: "98.7%", risk: "High", icon: "alert" },
-      { name: "Aphid Cluster Infestation", type: "Pest", confidence: "99.5%", risk: "Critical", icon: "bug" },
-      { name: "Nitrogen Chlorosis Deficiency", type: "Nutritional", confidence: "96.4%", risk: "Low", icon: "droplet" },
-      { name: "Bacterial Wilt (Ralstonia)", type: "Bacterial", confidence: "97.9%", risk: "Critical", icon: "shield" }
-    ]
-  },
-
-  sustainability: {
-    badge: "Eco-Agronomy Impact",
-    title: "Cultivating Abundance While Preserving Earth",
-    subtitle: "Precision agriculture is not just about higher yields — it is about ensuring our soils, waterways, and ecosystems thrive for generations.",
-    cards: [
-      {
-        id: "water",
-        icon: "droplet",
-        title: "Water Conservation",
-        value: 45,
-        suffix: "%",
-        metric: "45% reduction in freshwater use",
-        description: "Closed-loop micro-drip cycles eliminate over-watering, evaporation losses, and deep-soil leaching into groundwater tables."
-      },
-      {
-        id: "chemical",
-        icon: "flask",
-        title: "Reduced Chemical Usage",
-        value: 55,
-        suffix: "%",
-        metric: "55% cut in synthetic chemical runoff",
-        description: "Precision spray alerts apply pesticides only to affected leaves, preventing blanket chemical spraying and protecting pollinators."
-      },
-      {
-        id: "yield",
-        icon: "sprout",
-        title: "Better Crop Productivity",
-        value: 32,
-        suffix: "%",
-        metric: "32% increase in harvest tonnage",
-        description: "Eliminating crop water stress and nutrient deficiencies unlocks full genetic potential for heavier, premium-grade produce."
-      },
-      {
-        id: "sustainable",
-        icon: "globe",
-        title: "Sustainable Agriculture",
-        value: 85,
-        suffix: "%",
-        metric: "85% soil microbiome preservation index",
-        description: "Maintains optimal soil moisture and carbon balance, encouraging microbial biodiversity and long-term soil regeneration."
-      },
-      {
-        id: "waste",
-        icon: "recycle",
-        title: "Reduced Farming Waste",
-        value: 60,
-        suffix: "%",
-        metric: "60% reduction in pre-harvest crop spoil",
-        description: "Early disease identification stops blight epidemics before whole fields are contaminated, saving thousands of labor hours."
-      }
-    ],
-    ctaCard: {
-      badge: "Join 12,500+ Farmers",
-      title: "Ready to Transform Your Farm's Future?",
-      description: "Book an obligation-free telemetry audit. Our agricultural engineers evaluate your soil maps and calculate your exact ROI within 48 hours.",
-      buttonText: "Schedule Free Farm Audit",
-      href: "#contact"
+    {
+      icon: "droplets",
+      title: "Smart Root Hydration",
+      desc: "Multi-depth capacitive telemetry tracks moisture gradients at 10cm, 30cm, and 60cm to eliminate leaching."
+    },
+    {
+      icon: "file-text",
+      title: "Actionable Agricultural Reports",
+      desc: "Generate printable incident logs, disease progression sheets, and CSV exports for agricultural extension visits."
     }
-  },
+  ],
 
-  howItWorks: {
-    badge: "Seamless IoT Architecture",
-    title: "How SmartFarm Operates in the Field",
-    subtitle: "A completely autonomous 5-step loop connecting your soil directly to actionable intelligence and precision automated actions.",
-    steps: [
-      {
-        stepNumber: "01",
-        title: "Sensors Collect Data",
-        description: "Solar-powered wireless probes measure soil moisture, root temperature, electrical conductivity, and ambient air data every 60 seconds.",
-        icon: "sensor",
-        highlight: "Multi-depth telemetry"
-      },
-      {
-        stepNumber: "02",
-        title: "Data Sent to System",
-        description: "Encrypted low-power LoRaWAN and cellular telemetry transmits field readings securely to our cloud ag-engine even from remote off-grid farms.",
-        icon: "wifi",
-        highlight: "15km wireless range"
-      },
-      {
-        stepNumber: "03",
-        title: "AI Analyzes Data",
-        description: "Deep learning models cross-reference plant physiological growth models, satellite NDVI maps, and radar weather feeds to detect anomalies.",
-        icon: "cpu",
-        highlight: "Sub-second inference"
-      },
-      {
-        stepNumber: "04",
-        title: "Farmers Receive Insights",
-        description: "Instant clear push notifications, irrigation schedules, and diagnostic alerts appear on your phone, tablet, and operations desktop.",
-        icon: "bell",
-        highlight: "Real-time alerts"
-      },
-      {
-        stepNumber: "05",
-        title: "Automated Actions",
-        description: "Smart valves open for precise micro-bursts, fertigation injectors calibrate dosages, and autonomous drone sprayers launch on target.",
-        icon: "check-circle",
-        highlight: "Zero manual intervention"
-      }
+  // Wildlife Detection Species Database & Presets
+  wildlifeDatabase: [
+    {
+      id: "wild-boar",
+      commonName: "Wild Boar",
+      scientificName: "Sus scrofa",
+      threatLevel: "Medium",
+      defaultConfidence: "94.6%",
+      typicalHabit: "Nocturnal root-foraging; damages tuber crops, groundnuts, potatoes, and maize stalks.",
+      safetyGuidance: "Keep a safe distance from the animal. Avoid approaching or cornering it. Use reflective flashers, auditory buzzers, or bio-fencing. Do not attempt direct contact.",
+      recommendedActions: [
+        "Inspect perimeter trenches and bio-fencing borders",
+        "Activate mild non-lethal acoustic deterrent",
+        "Record incident location for forest department boundary log"
+      ],
+      sampleImage: "https://images.unsplash.com/photo-1727701773949-69e701bdb680?auto=format&fit=crop&w=800&q=80"
+    },
+    {
+      id: "asian-elephant",
+      commonName: "Asian Elephant",
+      scientificName: "Elephas maximus",
+      threatLevel: "High",
+      defaultConfidence: "97.2%",
+      typicalHabit: "Corridor migration; attracted to sugarcane fields, banana plantations, and ripening paddy.",
+      safetyGuidance: "CRITICAL SAFETY: Maintain an absolute safe perimeter (> 100 meters). Never direct high-beam torches into the animal's eyes. Alert neighboring farms and promptly inform the local Forest Department Rapid Response Team (RRT).",
+      recommendedActions: [
+        "Do not block migratory path or provoke the herd",
+        "Notify nearby village forest committee via AgroVision alert",
+        "Follow local Forest Department safety protocols"
+      ],
+      sampleImage: "https://images.unsplash.com/photo-1557050543-4d5f4e07ef46?auto=format&fit=crop&w=800&q=80"
+    },
+    {
+      id: "spotted-deer",
+      commonName: "Spotted Deer",
+      scientificName: "Axis axis",
+      threatLevel: "Low",
+      defaultConfidence: "92.4%",
+      typicalHabit: "Herbivore herd grazing; grazes on tender vegetable shoots, pulses, and grain seedlings.",
+      safetyGuidance: "Spotted deer are docile and skittish. Use mild wind-chimes or solar-powered perimeter LED strobes to gently deter them without harm.",
+      recommendedActions: [
+        "Deploy chili-rope borders or border shade netting",
+        "Ensure field fencing is intact without sharp barbs",
+        "Log grazing pattern for seasonal monitoring"
+      ],
+      sampleImage: "https://images.unsplash.com/photo-1484406566174-9da000fda645?auto=format&fit=crop&w=800&q=80"
+    },
+    {
+      id: "bonnet-macaque",
+      commonName: "Bonnet Macaque (Monkey)",
+      scientificName: "Macaca radiata",
+      threatLevel: "Medium",
+      defaultConfidence: "95.1%",
+      typicalHabit: "Diurnal troop foraging; damages fruit orchards, mangoes, tomatoes, and maize cobs.",
+      safetyGuidance: "Avoid leaving open food waste or harvest bins. Install nylon canopy nets over fruit trees. Bio-acoustic distress chirps can deter troops safely.",
+      recommendedActions: [
+        "Secure nursery seedlings with anti-monkey mesh",
+        "Harvest ripe fruit promptly to remove attraction",
+        "Avoid leaving open water storage buckets"
+      ],
+      sampleImage: "https://images.unsplash.com/photo-1540573133985-87b6da6d54a9?auto=format&fit=crop&w=800&q=80"
+    }
+  ],
+
+  // Crop Disease Diagnosis Presets & Knowledge Base
+  cropDiseaseDatabase: [
+    {
+      id: "tomato-early-blight",
+      crop: "Tomato",
+      disease: "Early Blight (Alternaria solani)",
+      confidence: "94.8%",
+      severity: "Moderate",
+      symptoms: "Concentric dark brown rings ('target spots') on older leaves, surrounded by yellow chlorotic halos. Lower foliage turns brown, withers, and drops prematurely.",
+      prevention: "Practice 3-year crop rotation with non-solanaceous crops. Stake plants for improved canopy airflow. Water at the base with drip lines to keep foliage dry.",
+      treatmentAdvice: "Apply organic Trichoderma harzianum soil drench or 5% neem seed kernel extract. For severe fungal spread, consult local agricultural extension officer for Mancozeb 75 WP dosage guidelines.",
+      sampleImage: "https://images.unsplash.com/photo-1592417817098-8f3d6910985b?auto=format&fit=crop&w=800&q=80"
+    },
+    {
+      id: "potato-late-blight",
+      crop: "Potato",
+      disease: "Late Blight (Phytophthora infestans)",
+      confidence: "92.5%",
+      severity: "High",
+      symptoms: "Water-soaked, dark olive to black lesions on leaf tips and stems. White velvety fungal sporulation visible on the underside during humid mornings.",
+      prevention: "Plant certified disease-free seed tubers. Space rows widely to accelerate foliage drying after morning dew. Destroy cull piles promptly.",
+      treatmentAdvice: "Ensure immediate drainage of standing furrow water. Apply protective copper hydroxide or consult your regional KVK (Krishi Vigyan Kendra) agronomist.",
+      sampleImage: "https://images.unsplash.com/photo-1518977676601-b53f82aba655?auto=format&fit=crop&w=800&q=80"
+    },
+    {
+      id: "rice-leaf-blast",
+      crop: "Paddy / Rice",
+      disease: "Rice Leaf Blast (Magnaporthe oryzae)",
+      confidence: "96.1%",
+      severity: "High",
+      symptoms: "Spindle-shaped or eye-shaped lesions with gray/whitish centers and dark reddish-brown margins on leaf blades. Lesions coalesce, burning the leaf canopy.",
+      prevention: "Avoid excessive split applications of chemical nitrogen fertilizer. Treat seeds with Pseudomonas fluorescens (10g/kg seed) before nursery sowing.",
+      treatmentAdvice: "Spray Pseudomonas fluorescens @ 2.5 kg/ha or consult the local agricultural officer for appropriate bio-formulation spray schedule.",
+      sampleImage: "https://images.unsplash.com/photo-1536939459926-301728717817?auto=format&fit=crop&w=800&q=80"
+    },
+    {
+      id: "healthy-paddy",
+      crop: "Paddy / Rice",
+      disease: "Healthy Vigorous Canopy",
+      confidence: "98.7%",
+      severity: "None",
+      symptoms: "Uniform emerald-green canopy with erect leaves, zero necrotic lesions, and balanced chlorophyll index (SPAD 38-42).",
+      prevention: "Maintain alternate wetting and drying (AWD) water management. Continue periodic field monitoring for stem borer or leaf folder eggs.",
+      treatmentAdvice: "No chemical or bio-fungicide needed. Maintain current micronutrient and nitrogen balance.",
+      sampleImage: "https://images.unsplash.com/photo-1530595467537-0b5996c41f2d?auto=format&fit=crop&w=800&q=80"
+    },
+    {
+      id: "corn-common-rust",
+      crop: "Maize / Corn",
+      disease: "Common Rust (Puccinia sorghi)",
+      confidence: "93.2%",
+      severity: "Moderate",
+      symptoms: "Small, circular to elongate golden-brown to cinnamon-brown pustules scattered across both upper and lower leaf surfaces. Pustules rupture the epidermis.",
+      prevention: "Select rust-resistant certified hybrid cultivars. Plant early in the season to evade peak airborne spore concentrations.",
+      treatmentAdvice: "Maintain optimal potassium nutrition to bolster cell wall resistance. Consult agronomist for targeted bio-spray.",
+      sampleImage: "https://images.unsplash.com/photo-1551754655-cd27e38d2076?auto=format&fit=crop&w=800&q=80"
+    }
+  ],
+
+  // Crop Care and Farming Guidance Library
+  cropCareLibrary: [
+    {
+      id: "rice",
+      name: "Rice / Paddy",
+      scientificName: "Oryza sativa",
+      season: "Kharif & Rabi Seasons",
+      growthStages: [
+        { stage: "Nursery Phase (0-25 days)", notes: "Maintain 1-2 cm shallow water film; apply well-decomposed organic compost." },
+        { stage: "Tillering Phase (25-55 days)", notes: "Shallow water (2.5 cm); top dress balanced nitrogen split." },
+        { stage: "Panicle Initiation (55-80 days)", notes: "Keep 5 cm water depth; critical moisture-sensitive physiological window." },
+        { stage: "Ripening & Harvest (80-120 days)", notes: "Drain water completely 10-14 days prior to combine harvesting." }
+      ],
+      wateringGuidance: "Practice Alternate Wetting and Drying (AWD) using a perforated field tube to conserve 25-35% water without reducing yield.",
+      soilPrep: "Puddled clayey loam or alluvial soil with pH 5.5 to 6.5. Incorporate green manure (Sesbania/Sunn hemp) 15 days before transplanting.",
+      fertilizerGuidance: "Standard recommendation: 120:40:40 kg N:P2O5:K2O per hectare. Apply nitrogen in 3 equal splits (basal, tillering, panicle initiation).",
+      commonDiseases: "Blast, Bacterial Leaf Blight, Sheath Blight, Brown Spot.",
+      wildlifeSafety: "Elephant herds and wild boars are attracted during ripening. Install perimeter bio-acoustic chimes and border lighting. Maintain a safe perimeter."
+    },
+    {
+      id: "tomato",
+      name: "Tomato",
+      scientificName: "Solanum lycopersicum",
+      season: "Year-Round Cultivation",
+      growthStages: [
+        { stage: "Seedling & Transplant (0-30 days)", notes: "Plant on raised beds with 60x45cm spacing; dip roots in Trichoderma suspension." },
+        { stage: "Vegetative Growth (30-50 days)", notes: "Stake vines with bamboo to elevate foliage away from damp soil." },
+        { stage: "Flowering & Fruit Set (50-75 days)", notes: "Consistent drip irrigation to prevent blossom end rot from calcium deficiency." },
+        { stage: "Fruit Maturation (75-110 days)", notes: "Gradual harvesting at breaker/pink color stage." }
+      ],
+      wateringGuidance: "Deliver 2 to 3 liters per plant per day via calibrated drip emitters. Avoid overhead sprinkler watering which promotes foliar blights.",
+      soilPrep: "Well-drained sandy loam or red loam rich in organic matter, pH 6.0 - 7.0. Add 25 tonnes/ha well-decomposed farmyard manure.",
+      fertilizerGuidance: "Recommended: 150:100:100 kg NPK/ha. Supplement with Calcium Nitrate and Boron foliar spray during flowering to stop fruit cracking.",
+      commonDiseases: "Early Blight, Late Blight, Tomato Leaf Curl Virus, Bacterial Wilt.",
+      wildlifeSafety: "Wild boars and monkeys frequently forage on ripening tomatoes. Install overhead nylon netting and solar flashers."
+    },
+    {
+      id: "sugarcane",
+      name: "Sugarcane",
+      scientificName: "Saccharum officinarum",
+      season: "Early, Mid, and Late Seasons",
+      growthStages: [
+        { stage: "Germination (0-35 days)", notes: "Maintain moist ridges without waterlogging." },
+        { stage: "Tillering & Formative (35-120 days)", notes: "Critical water demand; partial earthing up at 60 days." },
+        { stage: "Grand Growth (120-270 days)", notes: "Full earthing up at 120 days; detrash dry lower leaves." },
+        { stage: "Maturity & Ripening (270-360 days)", notes: "Withhold irrigation 15 days prior to harvest." }
+      ],
+      wateringGuidance: "Subsurface drip irrigation saves 40% water while increasing sucrose recovery by 15-20%.",
+      soilPrep: "Deep loamy soils with 45cm plowing depth. Form furrows spaced 4 to 5 feet apart for wide-row tractor cultivation.",
+      fertilizerGuidance: "275:60:110 kg N:P2O5:K2O per hectare. Complete nitrogen application before 90-120 days after planting.",
+      commonDiseases: "Red Rot (Colletotrichum falcatum), Smut, Grassy Shoot.",
+      wildlifeSafety: "Dense sugarcane canopies offer shelter to wildlife. Always make noise before entering tall crops. Clear a 3-meter boundary buffer strip."
+    },
+    {
+      id: "cotton",
+      name: "Cotton",
+      scientificName: "Gossypium hirsutum",
+      season: "Kharif / Winter Irrigated",
+      growthStages: [
+        { stage: "Vegetative Phase (0-45 days)", notes: "Thinning to single seedling per hill at 15-20 days." },
+        { stage: "Square Formation (45-70 days)", notes: "Scout for sucking pests (whiteflies, jassids, thrips)." },
+        { stage: "Boll Development (70-120 days)", notes: "Peak water consumption; spray NAA to prevent flower shedding." },
+        { stage: "Boll Bursting & Picking (120-160 days)", notes: "Hand pick clean seed cotton during dry mornings." }
+      ],
+      wateringGuidance: "Cotton is sensitive to waterlogging. Provide alternate furrow irrigation to preserve root oxygenation.",
+      soilPrep: "Deep black cotton soils (Vertisols) or fertile clayey loams with pH 7.5 to 8.5.",
+      fertilizerGuidance: "80:40:40 kg NPK/ha for hybrid cotton under irrigated conditions.",
+      commonDiseases: "Bacterial Blight, Alternaria Leaf Spot, Fusarium Wilt.",
+      wildlifeSafety: "Deer feed on tender squares. Install bio-fences with prickly pear or lemongrass borders."
+    },
+    {
+      id: "banana",
+      name: "Banana",
+      scientificName: "Musa acuminata",
+      season: "Year-Round Plantation",
+      growthStages: [
+        { stage: "Sucker Establishment (0-3 months)", notes: "Use 1.5-2.0 kg sword suckers treated with bio-fungicide." },
+        { stage: "Vegetative Phase (3-6 months)", notes: "Regular desuckering; keep only mother plant." },
+        { stage: "Shooting / Bunch Emergence (7-9 months)", notes: "Propping with casuarina poles against high winds." },
+        { stage: "Bunch Maturation (10-12 months)", notes: "Cover bunches with blue polyethylene sleeves." }
+      ],
+      wateringGuidance: "High water requirement: 15-20 liters per plant per day via micro-sprinklers or drip rings.",
+      soilPrep: "Deep, rich alluvial loam or clay loam with high drainage capacity, pH 6.5 to 7.5.",
+      fertilizerGuidance: "Apply 200g N, 50g P, and 300g K per plant divided over months 2, 4, 6, and 8.",
+      commonDiseases: "Panama Wilt (Fusarium oxysporum), Sigatoka Leaf Spot, Bunchy Top Virus.",
+      wildlifeSafety: "Elephants seek banana pseudo-stems for hydration. Install honeybee boundary fences and chili-grease boundary ropes."
+    }
+  ],
+
+  // Smart Irrigation Telemetry Defaults
+  irrigation: {
+    systemMode: "Autonomous Micro-Drip (Hardware Telemetry Ready)",
+    hardwareStatus: "ESP32 LoRaWAN Gateway Connected (Simulation Mode Active)",
+    sectors: [
+      { id: "sec-1", name: "Sector 1A • Paddy East", crop: "Paddy", moisture10cm: 68, moisture30cm: 72, moisture60cm: 78, valveStatus: "Closed", lastIrrigated: "4 hrs ago", flowRate: "0 L/min" },
+      { id: "sec-2", name: "Sector 2B • Tomato Polyhouse", crop: "Tomato", moisture10cm: 32, moisture30cm: 38, moisture60cm: 45, valveStatus: "Active", lastIrrigated: "Running (12 mins)", flowRate: "14.2 L/min" },
+      { id: "sec-3", name: "Sector 3C • Sugarcane Block", crop: "Sugarcane", moisture10cm: 54, moisture30cm: 59, moisture60cm: 64, valveStatus: "Closed", lastIrrigated: "Yesterday", flowRate: "0 L/min" },
+      { id: "sec-4", name: "Sector 4D • Banana Grove", crop: "Banana", moisture10cm: 48, moisture30cm: 52, moisture60cm: 58, valveStatus: "Standby", lastIrrigated: "8 hrs ago", flowRate: "0 L/min" }
+    ],
+    cropWaterNeeds: [
+      { crop: "Paddy / Rice", mmPerDay: "6.0 - 9.0 mm", method: "Alternate Wetting & Drying", criticalStage: "Panicle initiation & flowering" },
+      { crop: "Tomato", mmPerDay: "3.5 - 5.5 mm", method: "Precision Drip Emitter", criticalStage: "Fruit set & sizing" },
+      { crop: "Sugarcane", mmPerDay: "5.0 - 7.5 mm", method: "Subsurface Drip Irrigation", criticalStage: "Tillering & formative phase" },
+      { crop: "Cotton", mmPerDay: "4.0 - 6.0 mm", method: "Furrow & Drip", criticalStage: "Squaring & boll formation" },
+      { crop: "Banana", mmPerDay: "7.0 - 10.0 mm", method: "Micro-Sprinklers / Rings", criticalStage: "Shooting & bunch development" }
     ]
   },
 
-  contact: {
-    badge: "Get in Touch",
-    title: "Start Your Smart Farming Journey Today",
-    subtitle: "Have questions about sensor deployment, existing irrigation compatibility, or enterprise farm acreage? Our agricultural specialists are ready to assist.",
-    info: [
-      {
-        icon: "map-pin",
-        title: "Global Headquarters",
-        lines: [
-          "AgriTech Innovation Center, Suite 400",
-          "450 Harvest Parkway, Salinas Valley, CA 93901"
-        ]
-      },
-      {
-        icon: "mail",
-        title: "Direct Inquiries",
-        lines: [
-          "contact@smartfarm-precision.io",
-          "support@smartfarm-precision.io"
-        ]
-      },
-      {
-        icon: "phone",
-        title: "Phone & Dispatch",
-        lines: [
-          "+1 (800) 492-FARM (492-3276)",
-          "+1 (831) 555-0199 (Field Engineers)"
-        ]
-      },
-      {
-        icon: "clock",
-        title: "Operational Hours",
-        lines: [
-          "Monday – Friday: 06:00 AM – 07:00 PM PST",
-          "Saturday: 08:00 AM – 02:00 PM PST",
-          "24/7 Sensor Monitoring Support"
-        ]
-      }
-    ],
-    form: {
-      title: "Request a Customized Farm Evaluation",
-      description: "Fill in your acreage details and irrigation setup. We'll simulate your potential water savings and yield uplift.",
-      fields: {
-        namePlaceholder: "e.g. John Henderson",
-        emailPlaceholder: "e.g. john@hendersonfarms.com",
-        phonePlaceholder: "e.g. +1 (555) 014-8832",
-        farmSizePlaceholder: "e.g. 250 Acres (Corn & Soybeans)",
-        messagePlaceholder: "Tell us about your current irrigation methods, soil challenges, or crops..."
-      },
-      buttonText: "Submit Evaluation Request"
-    }
-  },
+  // Agricultural Weather Presets
+  weatherPresets: [
+    { name: "Thanjavur (Cauvery Delta)", lat: 10.787, lon: 79.1378, zone: "Paddy & Sugarcane Belt" },
+    { name: "Coimbatore", lat: 11.0168, lon: 76.9558, zone: "Cotton & Vegetable Hub" },
+    { name: "Madurai", lat: 9.9252, lon: 78.1198, zone: "Pulses & Jasmine Belt" },
+    { name: "Salem", lat: 11.6643, lon: 78.146, zone: "Tapioca & Mango Zone" },
+    { name: "Ludhiana", lat: 30.901, lon: 75.8573, zone: "Wheat & Rice Grain Bowl" },
+    { name: "Nashik", lat: 19.9975, lon: 73.7898, zone: "Onion & Grape Belt" }
+  ],
 
-  footer: {
-    brandText: "SmartFarm",
-    tagline: "Cultivating the future with AI & IoT.",
-    blurb: "SmartFarm provides growers with intelligent soil sensors, automated micro-irrigation systems, and edge computer vision crop diagnostics to drive sustainable yield expansion.",
-    columns: [
-      {
-        title: "Quick Links",
-        links: [
-          { name: "Home", href: "#home" },
-          { name: "About Us", href: "#about" },
-          { name: "Core Features", href: "#features" },
-          { name: "Live Dashboard Demo", href: "#dashboard" },
-          { name: "Smart Irrigation", href: "#irrigation" },
-          { name: "AI Foliage Scanner", href: "#crop-health" }
-        ]
-      },
-      {
-        title: "Solutions",
-        links: [
-          { name: "Vineyard Precision Water", href: "#irrigation" },
-          { name: "Orchard Fruit Canopy AI", href: "#crop-health" },
-          { name: "Row Crop Soil Telemetry", href: "#features" },
-          { name: "Commercial Greenhouse IoT", href: "#features" },
-          { name: "Water Conservation Audits", href: "#sustainability" },
-          { name: "Carbon Credit Verification", href: "#sustainability" }
-        ]
-      },
-      {
-        title: "Resources & Tech",
-        links: [
-          { name: "LoRaWAN Sensor Spec Sheet", href: "#features" },
-          { name: "Edge AI Disease Database", href: "#crop-health" },
-          { name: "Agronomist Case Studies", href: "#about" },
-          { name: "API Documentation", href: "#dashboard" },
-          { name: "Farm ROI Calculator", href: "#contact" },
-          { name: "System Status: 99.98%", href: "#dashboard" }
-        ]
-      }
-    ],
-    socials: [
-      { name: "Twitter / X", href: "https://twitter.com", icon: "x-twitter" },
-      { name: "LinkedIn", href: "https://linkedin.com", icon: "linkedin" },
-      { name: "GitHub", href: "https://github.com", icon: "github" },
-      { name: "YouTube", href: "https://youtube.com", icon: "youtube" }
-    ],
-    bottomNotice: "© 2026 SmartFarm Technologies Inc. All rights reserved. Built for modern growers worldwide."
+  // SIH / College Presentation About Details
+  aboutProject: {
+    title: "AgroVision – Smart Farming and AI-Based Detection System",
+    theme: "Smart Automation, Agriculture & Food Security (Smart India Hackathon)",
+    problemStatement: "Farmers encounter two compounding threats: (1) Uncontrolled nocturnal crop destruction by wildlife (wild boars, elephants, deer) causing up to 30-40% yield loss and dangerous human-wildlife conflict; (2) Devastating foliar diseases (blights, blasts, rusts) that go unnoticed until systemic necrosis occurs. In addition, irregular irrigation depletes groundwater resources.",
+    proposedSolution: "AgroVision provides a unified, farmer-friendly digital agronomy platform: (1) Computer vision-powered wildlife perimeter detection with mild non-startling audio alerts; (2) Leaf pathogen image diagnostics with actionable organic remedies; (3) IoT soil moisture depth telemetry for precision drip control; (4) Actionable crop care advice and printable farm reports.",
+    architecture: {
+      frontend: "React 18 + Vite, Modular Responsive UI, Web Audio API chime synthesis, MediaDevices Camera API, Geolocation API, LocalStorage persistence",
+      aiVision: "YOLOv8 Edge Object Detection (Wildlife) + MobileNetV3 / ResNet Foliar Pathology Classifier",
+      backend: "Python FastAPI / Flask REST Server (Endpoint integration ready)",
+      hardware: "ESP32 Microcontroller + Capacitive Multi-Depth Soil Sensors (10/30/60cm) + LoRaWAN / 4G Gateway"
+    },
+    limitationsHonesty: "Note: Sensor telemetry and AI predictions on this static deployment operate in robust client-side simulation and demo mode. To connect live camera inference to custom trained weights, launch the bundled Python backend server in the /backend folder.",
+    futureRoadmap: [
+      "Deployment of low-power solar edge camera boxes with PIR triggers on farm boundaries",
+      "Cellular SMS & WhatsApp voice dispatch for non-smartphone farmers",
+      "Integration with government crop insurance claim documentation portals"
+    ]
   }
 };

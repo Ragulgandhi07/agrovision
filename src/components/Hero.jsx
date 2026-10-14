@@ -3,13 +3,13 @@ import { siteData } from '../siteData';
 import { Icon } from './Icons';
 
 export function Hero() {
-  const { badge, headline, subheadline, ctaPrimary, ctaSecondary, stats } = siteData.hero;
+  const { hero } = siteData;
   const heroRef = useRef(null);
 
-  // Animated counters state: { water: 0, yield: 0, pesticide: 0, farmers: 0 }
+  // Animated counters state
   const [counts, setCounts] = useState(() => {
     const initial = {};
-    stats.forEach((s) => {
+    hero.stats.forEach((s) => {
       initial[s.id] = 0;
     });
     return initial;
@@ -24,18 +24,16 @@ export function Hero() {
         if (entry.isIntersecting && !hasAnimated) {
           setHasAnimated(true);
 
-          // Animate counters up from 0 to target
-          const duration = 2000; // 2 seconds
+          const duration = 2000;
           const startTime = performance.now();
 
           const animate = (currentTime) => {
             const elapsed = currentTime - startTime;
             const progress = Math.min(elapsed / duration, 1);
-            // Ease out cubic: 1 - pow(1 - progress, 3)
             const easeOut = 1 - Math.pow(1 - progress, 3);
 
             const nextCounts = {};
-            stats.forEach((s) => {
+            hero.stats.forEach((s) => {
               nextCounts[s.id] = Math.round(s.target * easeOut);
             });
             setCounts(nextCounts);
@@ -48,7 +46,7 @@ export function Hero() {
           requestAnimationFrame(animate);
         }
       },
-      { threshold: 0.2 }
+      { threshold: 0.15 }
     );
 
     if (heroRef.current) {
@@ -60,7 +58,7 @@ export function Hero() {
         observer.unobserve(heroRef.current);
       }
     };
-  }, [hasAnimated, stats]);
+  }, [hasAnimated, hero.stats]);
 
   const formatStatNumber = (val) => {
     return val >= 1000 ? val.toLocaleString() : val;
@@ -68,7 +66,7 @@ export function Hero() {
 
   return (
     <section id="home" className="hero-section" ref={heroRef}>
-      {/* Background with Dark Gradient Overlay */}
+      {/* Background with Dark Forest Overlay */}
       <div className="hero-bg-overlay" />
       <div className="hero-glow-orb" />
 
@@ -77,39 +75,61 @@ export function Hero() {
         <div className="hero-content">
           <div className="badge badge-dark">
             <span className="badge-dot" />
-            {badge}
+            {hero.badge}
           </div>
 
           <h1 className="hero-title">
-            Transforming Agriculture with <span>AI & Precision IoT</span>
+            AgroVision – <span>Smart Farming, Safer Crops</span>
           </h1>
 
           <p className="hero-subtitle">
-            {subheadline}
+            {hero.subheadline}
           </p>
 
-          <div className="hero-ctas">
-            <a href={ctaPrimary.href} className="btn btn-primary">
+          {/* 3 Call-To-Action Buttons required by prompt */}
+          <div className="hero-ctas-triple">
+            <a href="#dashboard" className="btn btn-primary">
               <Icon name="gauge" size={18} color="#ffffff" />
-              {ctaPrimary.text}
+              {hero.ctaDashboard}
             </a>
-            <a href={ctaSecondary.href} className="btn btn-glass">
-              {ctaSecondary.text}
-              <Icon name="arrow-right" size={18} color="#ffffff" />
+            <a href="#crop-disease" className="btn btn-glass">
+              <Icon name="leaf" size={18} color="#86efac" />
+              {hero.ctaCrop}
             </a>
+            <a href="#wildlife" className="btn btn-warning-glass">
+              <Icon name="shield-alert" size={18} color="#fde047" />
+              {hero.ctaWildlife}
+            </a>
+          </div>
+
+          {/* Quick Platform Pillars */}
+          <div className="hero-trust-badges">
+            <span className="trust-pill">
+              <Icon name="cpu" size={14} color="#86efac" /> AI Edge Detection
+            </span>
+            <span className="trust-pill">
+              <Icon name="volume-2" size={14} color="#86efac" /> Mild Audio Alerts
+            </span>
+            <span className="trust-pill">
+              <Icon name="droplets" size={14} color="#86efac" /> LoRaWAN Irrigation
+            </span>
+            <span className="trust-pill">
+              <Icon name="file-text" size={14} color="#86efac" /> Audit-Ready Reports
+            </span>
           </div>
         </div>
 
         {/* 4 Stat Cards counting up from 0 */}
         <div className="hero-stats-wrapper">
-          {stats.map((item) => (
+          {hero.stats.map((item) => (
             <div key={item.id} className="hero-stat-card">
               <div className="stat-number">
                 {formatStatNumber(counts[item.id] || 0)}
                 {item.suffix}
               </div>
-              <div className="stat-label">{item.label}</div>
-              <div className="stat-desc">{item.desc}</div>
+              <div className="stat-label">
+                {item.label}
+              </div>
             </div>
           ))}
         </div>

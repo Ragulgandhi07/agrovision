@@ -1,279 +1,328 @@
-import React, { useState } from 'react';
-import { siteData } from '../siteData';
+import React, { useState, useEffect } from 'react';
 import { Icon } from './Icons';
+import { getWildlifeHistory, getCropHistory } from '../utils/storage';
 
-export function LiveDashboard() {
-  const initial = siteData.dashboardInitial;
-
-  // Active sector state
-  const [sector, setSector] = useState('North Orchard • Sector 4B');
-  // Sensors state
-  const [sensors, setSensors] = useState(initial.sensors);
-  // Weather state
-  const [weather, setWeather] = useState(initial.weather);
-  // Weekly moisture bar chart state
-  const [weeklyMoisture, setWeeklyMoisture] = useState(initial.weeklyMoisture);
-  // Last updated timestamp
-  const [lastUpdated, setLastUpdated] = useState('Just now (18:24:10)');
-  // Spinning indicator state for the refresh button
+export function LiveDashboard({ refreshTrigger }) {
+  // Sector and telemetry states
+  const [activeSector, setActiveSector] = useState('Sector 2B • Tomato Polyhouse');
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState('Just now (Live Telemetry)');
 
-  // Helper function to re-randomize data
-  const handleRefreshData = () => {
+  // Dynamic counts loaded from storage + demo records
+  const [cropScans, setCropScans] = useState([]);
+  const [wildlifeEvents, setWildlifeEvents] = useState([]);
+
+  // Telemetry metrics
+  const [telemetry, setTelemetry] = useState({
+    soilMoisture: 42,
+    soilTemp: 26.4,
+    ambientTemp: 29.5,
+    humidity: 64,
+    waterReserve: 84,
+    valveState: 'Auto-Standby'
+  });
+
+  // Load latest scans and wildlife events from storage
+  useEffect(() => {
+    const updateDashboardData = () => {
+      setCropScans(getCropHistory());
+      setWildlifeEvents(getWildlifeHistory());
+    };
+    updateDashboardData();
+
+    window.addEventListener('storage', updateDashboardData);
+    return () => window.removeEventListener('storage', updateDashboardData);
+  }, [refreshTrigger]);
+
+  // Refresh handler that simulates real field telemetry update
+  const handleRefresh = () => {
     setIsRefreshing(true);
-
     setTimeout(() => {
-      // Re-randomize sensor values
-      const newSensors = sensors.map((sensor) => {
-        let newVal = sensor.value;
-        let newPct = sensor.percentage;
-        let newStatus = sensor.status;
-        let statusType = sensor.statusType;
-        let trend = sensor.trend;
-
-        if (sensor.id === 'temp') {
-          newVal = parseFloat((22 + Math.random() * 9).toFixed(1)); // 22.0 to 31.0
-          newPct = Math.round(((newVal - 10) / (45 - 10)) * 100);
-          newStatus = newVal > 29 ? 'Warm' : newVal < 24 ? 'Mild' : 'Optimal';
-          statusType = newVal > 29 ? 'warning' : 'success';
-          trend = `${newVal > 26 ? '+' : '-'}${(Math.random() * 1.5).toFixed(1)}°C trend`;
-        } else if (sensor.id === 'humidity') {
-          newVal = Math.round(50 + Math.random() * 35); // 50 to 85%
-          newPct = newVal;
-          newStatus = newVal > 75 ? 'Humid' : newVal < 55 ? 'Dry' : 'Normal';
-          statusType = newVal > 75 ? 'warning' : 'success';
-          trend = 'Canopy transpiration balanced';
-        } else if (sensor.id === 'moisture') {
-          newVal = Math.round(34 + Math.random() * 32); // 34 to 66%
-          newPct = newVal;
-          newStatus = newVal < 38 ? 'Low' : newVal > 60 ? 'Saturated' : 'Good';
-          statusType = newVal < 38 ? 'warning' : 'success';
-          trend = newVal < 38 ? 'Irrigation valve opening' : 'Moisture holding steady';
-        } else if (sensor.id === 'rainfall') {
-          newVal = parseFloat((Math.random() * 25).toFixed(1)); // 0.0 to 25.0 mm
-          newPct = Math.min(100, Math.round((newVal / 40) * 100));
-          newStatus = newVal === 0 ? 'Dry' : newVal > 18 ? 'Heavy' : 'Moderate';
-          statusType = 'info';
-          trend = newVal > 0 ? 'Accumulated precipitation' : 'No rain recorded in 24h';
-        } else if (sensor.id === 'crop-health') {
-          newVal = Math.round(91 + Math.random() * 8); // 91 to 99%
-          newPct = newVal;
-          newStatus = newVal >= 95 ? 'Excellent' : 'Good';
-          statusType = 'success';
-          trend = `NDVI 0.${84 + Math.floor(Math.random() * 8)} canopy index`;
-        } else if (sensor.id === 'water-level') {
-          newVal = Math.round(72 + Math.random() * 24); // 72 to 96%
-          newPct = newVal;
-          newStatus = newVal > 80 ? 'Sufficient' : 'Adequate';
-          statusType = 'success';
-          trend = `${Math.round(newVal / 6)} days reserve capacity`;
-        }
-
-        return {
-          ...sensor,
-          value: newVal,
-          percentage: newPct,
-          status: newStatus,
-          statusType,
-          trend
-        };
+      setTelemetry({
+        soilMoisture: Math.round(36 + Math.random() * 24),
+        soilTemp: parseFloat((24.5 + Math.random() * 4).toFixed(1)),
+        ambientTemp: parseFloat((27 + Math.random() * 6).toFixed(1)),
+        humidity: Math.round(55 + Math.random() * 25),
+        waterReserve: Math.round(75 + Math.random() * 20),
+        valveState: Math.random() > 0.5 ? 'Active Micro-Drip' : 'Auto-Standby'
       });
-
-      // Re-randomize 7-day soil moisture
-      const newWeekly = [
-        { day: 'Mon', value: Math.round(35 + Math.random() * 30), status: 'Good' },
-        { day: 'Tue', value: Math.round(35 + Math.random() * 30), status: 'Good' },
-        { day: 'Wed', value: Math.round(45 + Math.random() * 30), status: 'Irrigated' },
-        { day: 'Thu', value: Math.round(38 + Math.random() * 28), status: 'Good' },
-        { day: 'Fri', value: Math.round(36 + Math.random() * 32), status: 'Good' },
-        { day: 'Sat', value: Math.round(35 + Math.random() * 25), status: 'Moderate' },
-        { day: 'Sun', value: Math.round(40 + Math.random() * 30), status: 'Good' }
-      ];
-
-      // Re-randomize weather snippet
-      const newWeatherTemp = `${Math.round(23 + Math.random() * 8)}°C`;
-      const newWind = `${(6 + Math.random() * 7).toFixed(1)} km/h ${['N', 'NW', 'W', 'NE'][Math.floor(Math.random() * 4)]}`;
-      const newUv = `${(4.5 + Math.random() * 3.5).toFixed(1)} High`;
-
-      setSensors(newSensors);
-      setWeeklyMoisture(newWeekly);
-      setWeather((prev) => ({
-        ...prev,
-        temp: newWeatherTemp,
-        wind: newWind,
-        uvIndex: newUv
-      }));
-
-      // Update timestamp
-      const now = new Date();
-      const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-      setLastUpdated(`Today at ${timeStr}`);
+      const timeStr = new Date().toLocaleTimeString();
+      setLastUpdated(`Refreshed at ${timeStr}`);
       setIsRefreshing(false);
-    }, 450);
+    }, 600);
   };
 
-  const handleSectorChange = (e) => {
-    setSector(e.target.value);
-    handleRefreshData();
-  };
+  const totalCropScansCount = cropScans.length;
+  const totalWildlifeCount = wildlifeEvents.length;
 
   return (
     <section id="dashboard" className="section dashboard-section">
       <div className="container">
-        {/* Section Header */}
-        <div className="section-header">
-          <div className="badge badge-dark">
-            <span className="badge-dot" />
-            Interactive Farm IoT Telemetry
-          </div>
-          <h2 className="section-title light">Live Precision Farm Dashboard</h2>
-          <p className="section-subtitle light">
-            Simulate real-time field telemetry across our IoT edge nodes. Click &ldquo;Refresh Data&rdquo; to simulate live incoming sensor readings.
-          </p>
-        </div>
-
-        {/* Dashboard Top Toolbar */}
-        <div className="dashboard-toolbar">
-          <div className="dash-status-group">
-            <div className="dash-pulse-badge">
-              <span className="pulse-dot" />
-              CONNECTED TO LORAWAN GATEWAY
+        {/* Dashboard Top Header Bar */}
+        <div className="dashboard-header-bar">
+          <div>
+            <div className="badge">
+              <span className="badge-dot" />
+              Smart Farming Dashboard
             </div>
-
-            <select
-              className="dash-sector-selector"
-              value={sector}
-              onChange={handleSectorChange}
-              aria-label="Select Farm Sector"
-            >
-              <option value="North Orchard • Sector 4B">North Orchard • Sector 4B</option>
-              <option value="Vineyard Block 12 • South Ridge">Vineyard Block 12 • South Ridge</option>
-              <option value="East Corn & Soy • Parcel 7">East Corn &amp; Soy • Parcel 7</option>
-              <option value="Greenhouse Microclimate #2">Greenhouse Microclimate #2</option>
-            </select>
+            <h2 className="dashboard-title">
+              Farm Telemetry & Threat Surveillance
+            </h2>
+            <p className="dashboard-subtitle">
+              Real-time multi-depth sensor telemetry, perimeter event stream, and automated diagnostics.
+            </p>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-            <span className="dash-updated-text">
-              Last updated: <strong style={{ color: '#ffffff' }}>{lastUpdated}</strong>
-            </span>
+          <div className="dashboard-actions-group">
+            {/* Sector Selector */}
+            <select
+              value={activeSector}
+              onChange={(e) => setActiveSector(e.target.value)}
+              className="sector-select"
+            >
+              <option value="Sector 1A • Paddy East">Sector 1A • Paddy East</option>
+              <option value="Sector 2B • Tomato Polyhouse">Sector 2B • Tomato Polyhouse</option>
+              <option value="Sector 3C • Sugarcane Block">Sector 3C • Sugarcane Block</option>
+              <option value="Sector 4D • Banana Grove">Sector 4D • Banana Grove</option>
+            </select>
 
+            {/* Refresh Button */}
             <button
               type="button"
-              className={`btn-refresh ${isRefreshing ? 'spinning' : ''}`}
-              onClick={handleRefreshData}
+              className={`btn btn-outline btn-sm ${isRefreshing ? 'loading' : ''}`}
+              onClick={handleRefresh}
               disabled={isRefreshing}
             >
-              <Icon name="refresh" size={16} color="#ffffff" />
-              Refresh Data
+              <Icon name="refresh" size={16} className={isRefreshing ? 'spin' : ''} />
+              <span>{isRefreshing ? 'Refreshing...' : 'Refresh Data'}</span>
             </button>
           </div>
         </div>
 
-        {/* 6 Core Sensor Cards */}
-        <div className="sensor-cards-grid">
-          {sensors.map((sensor) => (
-            <div key={sensor.id} className="sensor-card">
-              <div className="sensor-card-top">
-                <div className="sensor-icon-box">
-                  <Icon name={sensor.icon} size={22} color="#4ade80" />
-                </div>
-                <span className={`sensor-badge ${sensor.statusType}`}>
-                  {sensor.status}
-                </span>
-              </div>
-
-              <div className="sensor-label">{sensor.name}</div>
-
-              <div className="sensor-value-row">
-                <span className="sensor-value">{sensor.value}</span>
-                <span className="sensor-unit">{sensor.unit}</span>
-              </div>
-
-              {/* Progress Bar */}
-              <div className="sensor-bar-bg" title={`${sensor.percentage}% capacity`}>
-                <div
-                  className="sensor-bar-fill"
-                  style={{ width: `${sensor.percentage}%` }}
-                />
-              </div>
-
-              <div className="sensor-trend">
-                <Icon name="trending-up" size={14} color="#86efac" />
-                <span>{sensor.trend}</span>
-              </div>
-            </div>
-          ))}
+        {/* Telemetry Status Banner (Honest Hardware / Simulation Badge) */}
+        <div className="telemetry-banner-notice">
+          <div className="telemetry-badge-pulse">
+            <span className="live-dot" />
+            <span className="telemetry-mode-text">
+              Telemetry Mode: ESP32 LoRaWAN Gateway Ready • Active Simulation Feed
+            </span>
+          </div>
+          <span className="last-sync-time">{lastUpdated}</span>
         </div>
 
-        {/* Secondary Row: Weather Card + 7-Day Soil Moisture Bar Chart */}
-        <div className="dashboard-extra-grid">
-          {/* Weather Card */}
-          <div className="dash-panel">
-            <div className="dash-panel-title">
-              <span>Sector Microclimate Station</span>
-              <span className="dash-pulse-badge" style={{ fontSize: '0.72rem', padding: '3px 8px' }}>
-                Active Telemetry
-              </span>
+        {/* Top 4 Key Metric Cards */}
+        <div className="dashboard-kpi-grid">
+          {/* Card 1: Total Crop Scans */}
+          <div className="kpi-card">
+            <div className="kpi-icon-wrap bg-green-subtle">
+              <Icon name="leaf" size={22} color="#16a34a" />
             </div>
-
-            <div className="weather-header">
-              <div className="weather-current">
-                <div style={{ color: '#4ade80' }}>
-                  <Icon name="cloud-sun" size={44} />
-                </div>
-                <div>
-                  <div className="weather-temp">{weather.temp}</div>
-                  <div className="weather-condition">{weather.condition}</div>
-                  <div className="weather-location">{sector}</div>
-                </div>
+            <div className="kpi-content">
+              <span className="kpi-label">Total Crop Scans</span>
+              <div className="kpi-value-row">
+                <span className="kpi-value">{totalCropScansCount}</span>
+                <span className="kpi-tag positive">Logged</span>
               </div>
-            </div>
-
-            <div className="weather-grid-metrics">
-              <div className="weather-metric-item">
-                <div className="metric-label">Wind Velocity</div>
-                <div className="metric-val">{weather.wind}</div>
-              </div>
-              <div className="weather-metric-item">
-                <div className="metric-label">Solar UV Index</div>
-                <div className="metric-val">{weather.uvIndex}</div>
-              </div>
-              <div className="weather-metric-item">
-                <div className="metric-label">Atm. Pressure</div>
-                <div className="metric-val">{weather.pressure}</div>
-              </div>
-              <div className="weather-metric-item">
-                <div className="metric-label">Dew Point</div>
-                <div className="metric-val">{weather.dewPoint}</div>
-              </div>
+              <span className="kpi-desc">AI foliage pathogen diagnostics</span>
             </div>
           </div>
 
-          {/* 7-Day Soil Moisture Bar Chart */}
-          <div className="dash-panel">
-            <div className="dash-panel-title">
-              <span>7-Day Soil Moisture History (% VWC)</span>
-              <span style={{ fontSize: '0.8rem', color: '#86efac', fontWeight: 600 }}>
-                Target: 40% - 60%
-              </span>
+          {/* Card 2: Total Wildlife Events */}
+          <div className="kpi-card">
+            <div className="kpi-icon-wrap bg-amber-subtle">
+              <Icon name="shield-alert" size={22} color="#d97706" />
+            </div>
+            <div className="kpi-content">
+              <span className="kpi-label">Wildlife Detection Events</span>
+              <div className="kpi-value-row">
+                <span className="kpi-value">{totalWildlifeCount}</span>
+                <span className="kpi-tag warning">Monitored</span>
+              </div>
+              <span className="kpi-desc">Wild boar, elephant, deer alerts</span>
+            </div>
+          </div>
+
+          {/* Card 3: Soil Moisture */}
+          <div className="kpi-card">
+            <div className="kpi-icon-wrap bg-blue-subtle">
+              <Icon name="droplets" size={22} color="#0284c7" />
+            </div>
+            <div className="kpi-content">
+              <span className="kpi-label">Root-Zone Moisture</span>
+              <div className="kpi-value-row">
+                <span className="kpi-value">{telemetry.soilMoisture}%</span>
+                <span className={`kpi-tag ${telemetry.soilMoisture < 35 ? 'danger' : 'positive'}`}>
+                  {telemetry.soilMoisture < 35 ? 'Low' : 'Optimal'}
+                </span>
+              </div>
+              <span className="kpi-desc">Capacitive 30cm probe telemetry</span>
+            </div>
+          </div>
+
+          {/* Card 4: Water Reserve & Valve */}
+          <div className="kpi-card">
+            <div className="kpi-icon-wrap bg-purple-subtle">
+              <Icon name="valve" size={22} color="#8b5cf6" />
+            </div>
+            <div className="kpi-content">
+              <span className="kpi-label">Micro-Valve Controller</span>
+              <div className="kpi-value-row">
+                <span className="kpi-value" style={{ fontSize: '1.25rem', paddingTop: '4px' }}>
+                  {telemetry.valveState}
+                </span>
+              </div>
+              <span className="kpi-desc">Water tank capacity: {telemetry.waterReserve}%</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Quick Actions Bar */}
+        <div className="dashboard-quick-actions">
+          <span className="qa-label">Quick Actions:</span>
+          <div className="qa-buttons">
+            <a href="#crop-disease" className="qa-btn">
+              <Icon name="scan" size={16} />
+              Analyze Crop Leaf
+            </a>
+            <a href="#wildlife" className="qa-btn qa-btn-warning">
+              <Icon name="camera" size={16} />
+              Launch Wildlife Cam
+            </a>
+            <a href="#irrigation" className="qa-btn">
+              <Icon name="droplet" size={16} />
+              Inspect Irrigation
+            </a>
+            <a href="#reports" className="qa-btn">
+              <Icon name="file-text" size={16} />
+              Export Farm Report
+            </a>
+          </div>
+        </div>
+
+        {/* Main Grid: Recent Wildlife Events & Recent Crop Detections */}
+        <div className="dashboard-two-col-grid">
+          {/* Left Column: Recent Wildlife Detection Incidents */}
+          <div className="dash-panel-card">
+            <div className="dash-panel-header">
+              <div className="dash-panel-title">
+                <Icon name="shield-alert" size={18} color="#d97706" />
+                <h3>Recent Wildlife Detection Events</h3>
+              </div>
+              <a href="#wildlife" className="panel-link">
+                View Module →
+              </a>
             </div>
 
-            <div className="chart-container">
-              {weeklyMoisture.map((dayItem, idx) => (
-                <div key={idx} className="chart-bar-column">
-                  <div className="chart-bar-track" title={`${dayItem.day}: ${dayItem.value}% (${dayItem.status})`}>
-                    <div
-                      className="chart-bar-inner"
-                      style={{ height: `${(dayItem.value / 80) * 100}%` }}
-                    >
-                      <span className="chart-value-tooltip">{dayItem.value}%</span>
+            <div className="dash-events-list">
+              {wildlifeEvents.slice(0, 3).map((w) => (
+                <div key={w.id} className="dash-event-item">
+                  <img
+                    src={w.thumbnail || 'https://images.unsplash.com/photo-1555685812-4b943f1cb0eb?auto=format&fit=crop&w=120&q=80'}
+                    alt={w.species}
+                    className="event-thumb"
+                  />
+                  <div className="event-info">
+                    <div className="event-title-row">
+                      <span className="event-name">{w.speciesCommon || w.species}</span>
+                      <span className={`threat-badge ${w.threatLevel?.toLowerCase() || 'medium'}`}>
+                        {w.threatLevel || 'Medium'} Threat
+                      </span>
+                    </div>
+                    <div className="event-meta">
+                      <span>{w.location}</span> • <span>{w.timestamp}</span>
+                    </div>
+                    <div className="event-confidence">
+                      Model Confidence: <strong>{w.confidence}</strong> ({w.source})
                     </div>
                   </div>
-                  <span className="chart-day-label">{dayItem.day}</span>
                 </div>
               ))}
             </div>
+          </div>
+
+          {/* Right Column: Recent Crop Health Results */}
+          <div className="dash-panel-card">
+            <div className="dash-panel-header">
+              <div className="dash-panel-title">
+                <Icon name="leaf" size={18} color="#16a34a" />
+                <h3>Recent Crop Disease Detections</h3>
+              </div>
+              <a href="#crop-disease" className="panel-link">
+                View Module →
+              </a>
+            </div>
+
+            <div className="dash-events-list">
+              {cropScans.slice(0, 3).map((c) => (
+                <div key={c.id} className="dash-event-item">
+                  <img
+                    src={c.image || 'https://images.unsplash.com/photo-1592417817098-8f3d6910985b?auto=format&fit=crop&w=120&q=80'}
+                    alt={c.crop}
+                    className="event-thumb"
+                  />
+                  <div className="event-info">
+                    <div className="event-title-row">
+                      <span className="event-name">{c.crop} – {c.condition}</span>
+                      <span className={`status-pill ${c.status === 'Healthy' ? 'status-good' : 'status-warn'}`}>
+                        {c.status}
+                      </span>
+                    </div>
+                    <div className="event-meta">
+                      <span>{c.timestamp}</span> • <span>Confidence: {c.confidence}</span>
+                    </div>
+                    <p className="event-snippet">{c.treatment}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* 7-Day Soil Moisture & Weather Preview Bar */}
+        <div className="dash-bottom-summary-card">
+          <div className="moisture-chart-wrap">
+            <h4>7-Day Root-Zone Soil Moisture Trend (%)</h4>
+            <div className="moisture-bars">
+              {[
+                { day: 'Mon', val: 45, status: 'Optimal' },
+                { day: 'Tue', val: 42, status: 'Optimal' },
+                { day: 'Wed', val: 34, status: 'Irrigated' },
+                { day: 'Thu', val: 56, status: 'Good' },
+                { day: 'Fri', val: 51, status: 'Optimal' },
+                { day: 'Sat', val: 46, status: 'Optimal' },
+                { day: 'Sun (Today)', val: telemetry.soilMoisture, status: 'Current' }
+              ].map((bar, idx) => (
+                <div key={idx} className="bar-col">
+                  <div className="bar-track">
+                    <div
+                      className={`bar-fill ${bar.val < 38 ? 'bar-low' : 'bar-good'}`}
+                      style={{ height: `${bar.val}%` }}
+                    />
+                  </div>
+                  <span className="bar-pct">{bar.val}%</span>
+                  <span className="bar-day">{bar.day}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="dash-weather-compact">
+            <h4>Weather Quick Glance</h4>
+            <div className="weather-compact-row">
+              <Icon name="sun" size={32} color="#f59e0b" />
+              <div>
+                <span className="wc-temp">{telemetry.ambientTemp}°C</span>
+                <span className="wc-condition">Clear Sky • Mild Breeze</span>
+              </div>
+            </div>
+            <div className="wc-details">
+              <span>Humidity: {telemetry.humidity}%</span>
+              <span>Precipitation: 10%</span>
+            </div>
+            <a href="#weather" className="btn btn-outline btn-sm full-width" style={{ marginTop: '12px' }}>
+              <Icon name="cloud-sun" size={16} />
+              Open Full Weather Radar
+            </a>
           </div>
         </div>
       </div>
