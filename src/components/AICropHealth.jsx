@@ -134,10 +134,14 @@ export function AICropHealth({ onScanSaved }) {
     if (!file) return;
 
     // Type validation
-    const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
-    if (!validTypes.includes(file.type)) {
+    const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg', 'image/jfif'];
+    const fileName = (file.name || '').toLowerCase();
+    const validExts = ['.jpg', '.jpeg', '.png', '.webp', '.jfif'];
+    const hasValidExt = validExts.some((ext) => fileName.endsWith(ext));
+
+    if (!validTypes.includes(file.type) && !hasValidExt) {
       setErrorMessage(
-        'Invalid file format. Please upload a JPEG, PNG, or WebP image.'
+        'Invalid file format. Please upload a JPEG, PNG, or WebP leaf image.'
       );
       return;
     }
@@ -157,13 +161,13 @@ export function AICropHealth({ onScanSaved }) {
     // Default to an unknown/pending custom image state
     setActivePreset({
       id: 'custom-upload',
-      crop: 'Field Leaf Specimen',
-      disease: 'Analyzing Diagnostic Features...',
+      crop: 'Field Foliage Specimen',
+      disease: 'Awaiting AI Diagnostic Classification',
       confidence: 'Pending',
       severity: 'Pending',
-      symptoms: 'Foliar scan awaiting neural inference.',
-      prevention: 'Keep leaf dry and follow general phytosanitary hygiene.',
-      treatmentAdvice: 'Please run the model inference below.',
+      symptoms: 'Foliar scan loaded. Click "Run AI Leaf Diagnosis" to classify symptoms.',
+      prevention: 'Maintain leaf hygiene and keep leaves well ventilated.',
+      treatmentAdvice: 'Execute neural classification below.',
       sampleImage: objectUrl
     });
     setAnalysisResult(null);
@@ -218,7 +222,21 @@ export function AICropHealth({ onScanSaved }) {
       if (selectedFile) {
         try {
           const formData = new FormData();
-          formData.append('file', selectedFile);
+          if (typeof selectedFile === 'string' && selectedFile.startsWith('data:')) {
+            const parts = selectedFile.split(',');
+            const byteString = atob(parts[1]);
+            const mimeString = parts[0].split(':')[1].split(';')[0];
+            const ab = new ArrayBuffer(byteString.length);
+            const ia = new Uint8Array(ab);
+            for (let i = 0; i < byteString.length; i++) {
+              ia[i] = byteString.charCodeAt(i);
+            }
+            const blob = new Blob([ab], { type: mimeString });
+            formData.append('file', blob, 'leaf-camera-capture.jpg');
+          } else {
+            formData.append('file', selectedFile);
+          }
+
           const response = await fetch('http://localhost:8000/api/predict-crop', {
             method: 'POST',
             body: formData,
@@ -241,11 +259,19 @@ export function AICropHealth({ onScanSaved }) {
         // High quality simulated diagnostic engine
         await new Promise((res) => setTimeout(res, 1200));
 
-        const result = activePreset.id === 'custom-upload'
+        const isCustom = activePreset.id === 'custom-upload' || activePreset.id === 'crop-camera-capture';
+        const result = isCustom
           ? {
-              ...presets[0],
-              confidence: '91.8%',
+              id: activePreset.id,
+              crop: 'Field Foliage Specimen',
+              disease: 'Early Blight (Alternaria solani) Detected',
+              confidence: '93.6%',
+              severity: 'Moderate',
+              symptoms: 'Target-spot concentric necrosis observed on foliar tissue with marginal chlorotic halo.',
+              prevention: 'Maintain leaf canopy aeration, water at root zone with drip lines, avoid overhead sprinkler wetting.',
+              treatmentAdvice: 'Apply organic Trichoderma harzianum soil drench or neem seed kernel extract (5%). Consult agronomist for targeted bio-fungicide.',
               sampleImage: previewUrl,
+              isDemoUpload: true,
               timestamp: new Date().toLocaleString()
             }
           : {
@@ -380,6 +406,10 @@ export function AICropHealth({ onScanSaved }) {
                   alt="Leaf Specimen"
                   className="viewfinder-img"
                   style={{ display: isCameraActive ? 'none' : 'block' }}
+                  onError={(e) => {
+                    e.target.onerror = null;
+                    e.target.src = presets[0].sampleImage;
+                  }}
                 />
 
                 {/* Animated HUD Laser Reticle */}
@@ -530,6 +560,15 @@ export function AICropHealth({ onScanSaved }) {
                     {analysisResult.timestamp || '2026-10-14 10:30'}
                   </span>
                 </div>
+
+                {analysisResult.isDemoUpload && (
+                  <div className="demo-mode-notice" style={{ marginBottom: '14px' }}>
+                    <Icon name="info" size={16} />
+                    <span>
+                      <strong>Interactive Simulation Mode:</strong> Diagnostic result simulated client-side. Start local Python FastAPI backend at port 8000 for live neural inference.
+                    </span>
+                  </div>
+                )}
 
                 <div className="diagnostic-block">
                   <h4 className="diag-heading">

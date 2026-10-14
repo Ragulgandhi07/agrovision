@@ -167,7 +167,7 @@ export const siteData = {
       symptoms: "Concentric dark brown rings ('target spots') on older leaves, surrounded by yellow chlorotic halos. Lower foliage turns brown, withers, and drops prematurely.",
       prevention: "Practice 3-year crop rotation with non-solanaceous crops. Stake plants for improved canopy airflow. Water at the base with drip lines to keep foliage dry.",
       treatmentAdvice: "Apply organic Trichoderma harzianum soil drench or 5% neem seed kernel extract. For severe fungal spread, consult local agricultural extension officer for Mancozeb 75 WP dosage guidelines.",
-      sampleImage: "https://images.unsplash.com/photo-1592417817098-8f3d6910985b?auto=format&fit=crop&w=800&q=80"
+      sampleImage: "https://upload.wikimedia.org/wikipedia/commons/thumb/0/04/Alternaria_solani_-_leaf_lesions.jpg/1280px-Alternaria_solani_-_leaf_lesions.jpg"
     },
     {
       id: "potato-late-blight",
@@ -178,7 +178,7 @@ export const siteData = {
       symptoms: "Water-soaked, dark olive to black lesions on leaf tips and stems. White velvety fungal sporulation visible on the underside during humid mornings.",
       prevention: "Plant certified disease-free seed tubers. Space rows widely to accelerate foliage drying after morning dew. Destroy cull piles promptly.",
       treatmentAdvice: "Ensure immediate drainage of standing furrow water. Apply protective copper hydroxide or consult your regional KVK (Krishi Vigyan Kendra) agronomist.",
-      sampleImage: "https://images.unsplash.com/photo-1518977676601-b53f82aba655?auto=format&fit=crop&w=800&q=80"
+      sampleImage: "https://upload.wikimedia.org/wikipedia/commons/thumb/1/14/Phytophthora_infestans_on_potato_leaf.jpg/1280px-Phytophthora_infestans_on_potato_leaf.jpg"
     },
     {
       id: "rice-leaf-blast",
@@ -189,7 +189,7 @@ export const siteData = {
       symptoms: "Spindle-shaped or eye-shaped lesions with gray/whitish centers and dark reddish-brown margins on leaf blades. Lesions coalesce, burning the leaf canopy.",
       prevention: "Avoid excessive split applications of chemical nitrogen fertilizer. Treat seeds with Pseudomonas fluorescens (10g/kg seed) before nursery sowing.",
       treatmentAdvice: "Spray Pseudomonas fluorescens @ 2.5 kg/ha or consult the local agricultural officer for appropriate bio-formulation spray schedule.",
-      sampleImage: "https://images.unsplash.com/photo-1536939459926-301728717817?auto=format&fit=crop&w=800&q=80"
+      sampleImage: "https://upload.wikimedia.org/wikipedia/commons/a/ae/Rice_blast.jpg"
     },
     {
       id: "healthy-paddy",
@@ -200,7 +200,7 @@ export const siteData = {
       symptoms: "Uniform emerald-green canopy with erect leaves, zero necrotic lesions, and balanced chlorophyll index (SPAD 38-42).",
       prevention: "Maintain alternate wetting and drying (AWD) water management. Continue periodic field monitoring for stem borer or leaf folder eggs.",
       treatmentAdvice: "No chemical or bio-fungicide needed. Maintain current micronutrient and nitrogen balance.",
-      sampleImage: "https://images.unsplash.com/photo-1530595467537-0b5996c41f2d?auto=format&fit=crop&w=800&q=80"
+      sampleImage: "https://upload.wikimedia.org/wikipedia/commons/0/04/Rice_leaf.jpg"
     },
     {
       id: "corn-common-rust",
@@ -211,7 +211,7 @@ export const siteData = {
       symptoms: "Small, circular to elongate golden-brown to cinnamon-brown pustules scattered across both upper and lower leaf surfaces. Pustules rupture the epidermis.",
       prevention: "Select rust-resistant certified hybrid cultivars. Plant early in the season to evade peak airborne spore concentrations.",
       treatmentAdvice: "Maintain optimal potassium nutrition to bolster cell wall resistance. Consult agronomist for targeted bio-spray.",
-      sampleImage: "https://images.unsplash.com/photo-1551754655-cd27e38d2076?auto=format&fit=crop&w=800&q=80"
+      sampleImage: "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b2/Puccinia_sorghi_Schwein._5465568.jpg/1280px-Puccinia_sorghi_Schwein._5465568.jpg"
     }
   ],
 
