@@ -107,7 +107,7 @@ export const siteData = {
         "Activate mild non-lethal acoustic deterrent",
         "Record incident location for forest department boundary log"
       ],
-      sampleImage: "https://images.unsplash.com/photo-1727701773949-69e701bdb680?auto=format&fit=crop&w=800&q=80"
+      sampleImage: "https://images.pexels.com/photos/247399/pexels-photo-247399.jpeg?auto=compress&cs=tinysrgb&w=800"
     },
     {
       id: "asian-elephant",
@@ -122,7 +122,7 @@ export const siteData = {
         "Notify nearby village forest committee via AgroVision alert",
         "Follow local Forest Department safety protocols"
       ],
-      sampleImage: "https://images.unsplash.com/photo-1557050543-4d5f4e07ef46?auto=format&fit=crop&w=800&q=80"
+      sampleImage: "https://images.pexels.com/photos/66898/elephant-cub-tsavo-kenya-66898.jpeg?auto=compress&cs=tinysrgb&w=800"
     },
     {
       id: "spotted-deer",
@@ -137,7 +137,7 @@ export const siteData = {
         "Ensure field fencing is intact without sharp barbs",
         "Log grazing pattern for seasonal monitoring"
       ],
-      sampleImage: "https://images.unsplash.com/photo-1484406566174-9da000fda645?auto=format&fit=crop&w=800&q=80"
+      sampleImage: "https://images.pexels.com/photos/1345190/pexels-photo-1345190.jpeg?auto=compress&cs=tinysrgb&w=800"
     },
     {
       id: "bonnet-macaque",
@@ -152,7 +152,7 @@ export const siteData = {
         "Harvest ripe fruit promptly to remove attraction",
         "Avoid leaving open water storage buckets"
       ],
-      sampleImage: "https://images.unsplash.com/photo-1540573133985-87b6da6d54a9?auto=format&fit=crop&w=800&q=80"
+      sampleImage: "https://images.pexels.com/photos/1123765/pexels-photo-1123765.jpeg?auto=compress&cs=tinysrgb&w=800"
     }
   ],
 

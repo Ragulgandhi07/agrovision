@@ -22,7 +22,7 @@ const INITIAL_WILDLIFE_EVENTS = [
     status: 'Verified',
     threatLevel: 'Medium',
     isDemo: true,
-    thumbnail: 'https://images.unsplash.com/photo-1555685812-4b943f1cb0eb?auto=format&fit=crop&w=300&q=80',
+    thumbnail: 'https://images.pexels.com/photos/247399/pexels-photo-247399.jpeg?auto=compress&cs=tinysrgb&w=300',
     notes: 'Foraging observed near cassava and groundnut boundary.'
   },
   {
@@ -36,7 +36,7 @@ const INITIAL_WILDLIFE_EVENTS = [
     status: 'Alert Dispatched',
     threatLevel: 'High',
     isDemo: true,
-    thumbnail: 'https://images.unsplash.com/photo-1557050543-4d5f4e07ef46?auto=format&fit=crop&w=300&q=80',
+    thumbnail: 'https://images.pexels.com/photos/66898/elephant-cub-tsavo-kenya-66898.jpeg?auto=compress&cs=tinysrgb&w=300',
     notes: 'Solitary elephant detected traversing elephant corridor buffer.'
   },
   {
@@ -50,7 +50,7 @@ const INITIAL_WILDLIFE_EVENTS = [
     status: 'Resolved',
     threatLevel: 'Low',
     isDemo: true,
-    thumbnail: 'https://images.unsplash.com/photo-1484406566174-9da000fda645?auto=format&fit=crop&w=300&q=80',
+    thumbnail: 'https://images.pexels.com/photos/1345190/pexels-photo-1345190.jpeg?auto=compress&cs=tinysrgb&w=300',
     notes: 'Herd of 3 grazing on clover cover crop without crop harm.'
   }
 ];
@@ -66,7 +66,7 @@ const INITIAL_CROP_SCANS = [
     timestamp: '2026-10-14 08:30:10',
     isDemo: true,
     status: 'Action Recommended',
-    image: 'https://images.unsplash.com/photo-1592417817098-8f3d6910985b?auto=format&fit=crop&w=400&q=80',
+    image: 'https://images.pexels.com/photos/1327838/pexels-photo-1327838.jpeg?auto=compress&cs=tinysrgb&w=600',
     treatment: 'Apply neem seed kernel extract (5%) or copper oxychloride. Prune lower diseased foliage.'
   },
   {
@@ -78,7 +78,7 @@ const INITIAL_CROP_SCANS = [
     timestamp: '2026-10-13 14:10:45',
     isDemo: true,
     status: 'Healthy',
-    image: 'https://images.unsplash.com/photo-1530595467537-0b5996c41f2d?auto=format&fit=crop&w=400&q=80',
+    image: 'https://images.pexels.com/photos/247599/pexels-photo-247599.jpeg?auto=compress&cs=tinysrgb&w=600',
     treatment: 'Maintain current water depth (2-3cm) during panicle initiation.'
   },
   {
@@ -90,7 +90,7 @@ const INITIAL_CROP_SCANS = [
     timestamp: '2026-10-12 11:40:20',
     isDemo: true,
     status: 'Action Required',
-    image: 'https://images.unsplash.com/photo-1518977676601-b53f82aba655?auto=format&fit=crop&w=400&q=80',
+    image: 'https://images.pexels.com/photos/144248/potatoes-vegetables-erdfrucht-bio-144248.jpeg?auto=compress&cs=tinysrgb&w=600',
     treatment: 'Ensure furrow drainage. Spray Mancozeb 75% WP under agronomist guidance.'
   }
 ];
@@ -167,8 +167,32 @@ export function getWildlifeHistory() {
     localStorage.setItem(STORAGE_KEYS.WILDLIFE_HISTORY, JSON.stringify(INITIAL_WILDLIFE_EVENTS));
     return INITIAL_WILDLIFE_EVENTS;
   }
+  // Map of old Unsplash URLs -> new reliable Pexels URLs
+  const THUMBNAIL_MIGRATION = {
+    'photo-1727701773949-69e701bdb680': 'https://images.pexels.com/photos/247399/pexels-photo-247399.jpeg?auto=compress&cs=tinysrgb&w=300',
+    'photo-1555685812-4b943f1cb0eb': 'https://images.pexels.com/photos/247399/pexels-photo-247399.jpeg?auto=compress&cs=tinysrgb&w=300',
+    'photo-1557050543-4d5f4e07ef46': 'https://images.pexels.com/photos/66898/elephant-cub-tsavo-kenya-66898.jpeg?auto=compress&cs=tinysrgb&w=300',
+    'photo-1484406566174-9da000fda645': 'https://images.pexels.com/photos/1345190/pexels-photo-1345190.jpeg?auto=compress&cs=tinysrgb&w=300',
+    'photo-1540573133985-87b6da6d54a9': 'https://images.pexels.com/photos/1123765/pexels-photo-1123765.jpeg?auto=compress&cs=tinysrgb&w=300',
+  };
   try {
-    return JSON.parse(stored);
+    const parsed = JSON.parse(stored);
+    let updated = false;
+    const sanitized = parsed.map((item) => {
+      if (item.thumbnail) {
+        for (const [oldId, newUrl] of Object.entries(THUMBNAIL_MIGRATION)) {
+          if (item.thumbnail.includes(oldId)) {
+            updated = true;
+            return { ...item, thumbnail: newUrl };
+          }
+        }
+      }
+      return item;
+    });
+    if (updated) {
+      localStorage.setItem(STORAGE_KEYS.WILDLIFE_HISTORY, JSON.stringify(sanitized));
+    }
+    return sanitized;
   } catch (e) {
     return INITIAL_WILDLIFE_EVENTS;
   }
@@ -204,7 +228,33 @@ export function getCropHistory() {
     return INITIAL_CROP_SCANS;
   }
   try {
-    return JSON.parse(stored);
+    const parsed = JSON.parse(stored);
+    const CROP_URL_MAP = {
+      'photo-1592417817098-8f3d6910985b': 'https://images.pexels.com/photos/1327838/pexels-photo-1327838.jpeg?auto=compress&cs=tinysrgb&w=600',
+      'photo-1592841200221-a6898f307baa': 'https://images.pexels.com/photos/1327838/pexels-photo-1327838.jpeg?auto=compress&cs=tinysrgb&w=600',
+      'photo-1530595467537-0b5996c41f2d': 'https://images.pexels.com/photos/247599/pexels-photo-247599.jpeg?auto=compress&cs=tinysrgb&w=600',
+      'photo-1518977676601-b53f82aba655': 'https://images.pexels.com/photos/144248/potatoes-vegetables-erdfrucht-bio-144248.jpeg?auto=compress&cs=tinysrgb&w=600',
+    };
+    let updated = false;
+    const sanitized = parsed.map((item) => {
+      if (item.image) {
+        for (const [key, pexelsUrl] of Object.entries(CROP_URL_MAP)) {
+          if (item.image.includes(key)) {
+            updated = true;
+            return { ...item, image: pexelsUrl };
+          }
+        }
+        if (item.image.includes('unsplash.com')) {
+          updated = true;
+          return { ...item, image: 'https://images.pexels.com/photos/1084540/pexels-photo-1084540.jpeg?auto=compress&cs=tinysrgb&w=600' };
+        }
+      }
+      return item;
+    });
+    if (updated) {
+      localStorage.setItem(STORAGE_KEYS.CROP_HISTORY, JSON.stringify(sanitized));
+    }
+    return sanitized;
   } catch (e) {
     return INITIAL_CROP_SCANS;
   }

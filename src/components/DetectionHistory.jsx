@@ -9,6 +9,7 @@ import {
   clearCropHistory,
   exportToCSV
 } from '../utils/storage';
+import { handleImageFallback, DEFAULT_CROP_IMAGE, DEFAULT_WILDLIFE_IMAGE } from '../utils/imageFallbacks';
 
 export function DetectionHistory({ refreshTrigger }) {
   const [wildlifeList, setWildlifeList] = useState([]);
@@ -199,9 +200,10 @@ export function DetectionHistory({ refreshTrigger }) {
                     <tr key={item.id} className="ledger-row">
                       <td>
                         <img
-                          src={item.image || item.thumbnail || 'https://images.unsplash.com/photo-1592417817098-8f3d6910985b?auto=format&fit=crop&w=80&q=80'}
+                          src={item.image || item.thumbnail || (item.category === 'wildlife' ? DEFAULT_WILDLIFE_IMAGE : DEFAULT_CROP_IMAGE)}
                           alt={item.title}
                           className="ledger-thumb"
+                          onError={(e) => handleImageFallback(e, item.category === 'wildlife' ? 'wildlife' : 'crop')}
                           onClick={() => setSelectedItem(item)}
                         />
                       </td>
@@ -281,9 +283,10 @@ export function DetectionHistory({ refreshTrigger }) {
 
               <div className="event-modal-body">
                 <img
-                  src={selectedItem.image || selectedItem.thumbnail}
+                  src={selectedItem.image || selectedItem.thumbnail || (selectedItem.category === 'wildlife' ? DEFAULT_WILDLIFE_IMAGE : DEFAULT_CROP_IMAGE)}
                   alt={selectedItem.title}
                   className="modal-event-img"
+                  onError={(e) => handleImageFallback(e, selectedItem.category === 'wildlife' ? 'wildlife' : 'crop')}
                 />
                 <div className="modal-event-fields">
                   <div className="m-field full">

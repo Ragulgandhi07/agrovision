@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Icon } from './Icons';
 import { getWildlifeHistory, getCropHistory } from '../utils/storage';
+import { handleImageFallback, DEFAULT_CROP_IMAGE, DEFAULT_WILDLIFE_IMAGE } from '../utils/imageFallbacks';
 
 export function LiveDashboard({ refreshTrigger }) {
   // Sector and telemetry states
@@ -217,9 +218,10 @@ export function LiveDashboard({ refreshTrigger }) {
               {wildlifeEvents.slice(0, 3).map((w) => (
                 <div key={w.id} className="dash-event-item">
                   <img
-                    src={w.thumbnail || 'https://images.unsplash.com/photo-1555685812-4b943f1cb0eb?auto=format&fit=crop&w=120&q=80'}
+                    src={w.thumbnail || DEFAULT_WILDLIFE_IMAGE}
                     alt={w.species}
                     className="event-thumb"
+                    onError={(e) => handleImageFallback(e, 'wildlife')}
                   />
                   <div className="event-info">
                     <div className="event-title-row">
@@ -256,9 +258,10 @@ export function LiveDashboard({ refreshTrigger }) {
               {cropScans.slice(0, 3).map((c) => (
                 <div key={c.id} className="dash-event-item">
                   <img
-                    src={c.image || 'https://images.unsplash.com/photo-1592417817098-8f3d6910985b?auto=format&fit=crop&w=120&q=80'}
+                    src={c.image || DEFAULT_CROP_IMAGE}
                     alt={c.crop}
                     className="event-thumb"
+                    onError={(e) => handleImageFallback(e, 'crop')}
                   />
                   <div className="event-info">
                     <div className="event-title-row">

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { siteData } from '../siteData';
 import { Icon } from './Icons';
 import { playMildWildlifeChime } from '../utils/audioAlert';
@@ -10,6 +10,14 @@ import {
   addNotification,
   exportToCSV
 } from '../utils/storage';
+import { handleImageFallback, DEFAULT_WILDLIFE_IMAGE } from '../utils/imageFallbacks';
+import {
+  loadCocoModel,
+  subscribeCocoStatus,
+  runWildlifeDetection,
+  drawBoundingBoxes,
+  clearCanvas,
+} from '../utils/tfModels';
 
 export function WildlifeDetection({
   soundEnabled,
@@ -33,10 +41,17 @@ export function WildlifeDetection({
   // Camera stream states
   const [isCameraActive, setIsCameraActive] = useState(false);
   const [cameraError, setCameraError] = useState('');
+  const [facingMode, setFacingMode] = useState('environment'); // 'environment' = rear, 'user' = front
   const videoRef = useRef(null);
   const streamRef = useRef(null);
-  const canvasRef = useRef(null);
+  const canvasRef = useRef(null);          // hidden capture canvas
+  const overlayCanvasRef = useRef(null);   // visible bbox overlay canvas
+  const detectionLoopRef = useRef(null);   // setInterval handle for live detection
   const fileInputRef = useRef(null);
+
+  // AI Model state
+  const [modelStatus, setModelStatus] = useState('idle'); // idle|loading|ready|error
+  const [liveDetections, setLiveDetections] = useState([]); // detections on current frame
 
   // Incident location states
   const [incidentLocation, setIncidentLocation] = useState('Sector 4B • South Border Trench');
@@ -54,16 +69,81 @@ export function WildlifeDetection({
     setHistoryRecords(getWildlifeHistory());
   }, []);
 
-  // Cleanup camera stream on unmount
+  // Preload COCO-SSD model on mount and subscribe to status
+  useEffect(() => {
+    const unsub = subscribeCocoStatus(setModelStatus);
+    loadCocoModel().catch(() => {}); // fire and forget; errors handled by status
+    return unsub;
+  }, []);
+
+  // Cleanup camera stream and detection loop on unmount
+  // NOTE: uses refs directly — functions are not yet defined at this point in render
   useEffect(() => {
     return () => {
-      stopCameraStream();
+      if (detectionLoopRef.current) {
+        clearInterval(detectionLoopRef.current);
+        detectionLoopRef.current = null;
+      }
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(t => t.stop());
+        streamRef.current = null;
+      }
+      if (videoRef.current) videoRef.current.srcObject = null;
     };
   }, []);
 
-  // Camera controls
-  const startCamera = async () => {
+  // ── Detection loop helpers ──────────────────────────────────────────────────
+  const stopDetectionLoop = () => {
+    if (detectionLoopRef.current) {
+      clearInterval(detectionLoopRef.current);
+      detectionLoopRef.current = null;
+    }
+    setLiveDetections([]);
+    if (overlayCanvasRef.current) clearCanvas(overlayCanvasRef.current);
+  };
+
+  const startDetectionLoop = useCallback(() => {
+    if (detectionLoopRef.current) return; // already running
+    if (modelStatus !== 'ready') return;  // model not loaded yet
+
+    detectionLoopRef.current = setInterval(async () => {
+      const video = videoRef.current;
+      const overlay = overlayCanvasRef.current;
+      if (!video || video.readyState < 2 || !overlay) return;
+
+      try {
+        const detections = await runWildlifeDetection(video);
+        setLiveDetections(detections);
+
+        // Sync canvas size to displayed video
+        overlay.width  = video.videoWidth  || video.clientWidth  || 640;
+        overlay.height = video.videoHeight || video.clientHeight || 480;
+        clearCanvas(overlay);
+
+        if (detections.length > 0) {
+          drawBoundingBoxes(
+            overlay,
+            detections,
+            video.videoWidth  || 640,
+            video.videoHeight || 480
+          );
+        }
+      } catch (_) { /* model busy or frame unavailable */ }
+    }, 700); // throttled to ~1.4 fps for performance
+  }, [modelStatus]);
+
+  // Re-start loop when model becomes ready while camera is active
+  useEffect(() => {
+    if (isCameraActive && modelStatus === 'ready' && !detectionLoopRef.current) {
+      startDetectionLoop();
+    }
+  }, [isCameraActive, modelStatus, startDetectionLoop]);
+
+  // ── Camera controls ─────────────────────────────────────────────────────────
+  const startCamera = async (overrideFacingMode) => {
     setCameraError('');
+    const requestedFacing = overrideFacingMode || facingMode;
+
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       setCameraError(
         'Camera access is not supported by this browser or requires a secure HTTPS/localhost context.'
@@ -71,18 +151,23 @@ export function WildlifeDetection({
       return;
     }
 
+    // Stop existing stream first
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(t => t.stop());
+      streamRef.current = null;
+    }
+    stopDetectionLoop();
+
     try {
       let stream;
       try {
         stream = await navigator.mediaDevices.getUserMedia({
-          video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'environment' },
+          video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: { ideal: requestedFacing } },
           audio: false
         });
       } catch (firstErr) {
-        if (firstErr.name === 'NotAllowedError') {
-          throw firstErr;
-        }
-        // Fallback directly to basic camera stream
+        if (firstErr.name === 'NotAllowedError') throw firstErr;
+        // Fallback to basic camera (no facing constraint)
         stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
       }
 
@@ -90,17 +175,11 @@ export function WildlifeDetection({
       setIsCameraActive(true);
       setInputSource('camera');
 
-      // Bind directly to video element synchronously
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        try {
-          await videoRef.current.play();
-        } catch (playErr) {
-          console.warn('Video play() blocked:', playErr);
-        }
+        try { await videoRef.current.play(); } catch (e) { console.warn('play() blocked:', e); }
       }
 
-      // Backup tick check
       setTimeout(async () => {
         if (videoRef.current && videoRef.current.srcObject !== stream) {
           videoRef.current.srcObject = stream;
@@ -108,9 +187,15 @@ export function WildlifeDetection({
         }
       }, 50);
 
-      setSuccessBanner('Live camera feed started successfully.');
+      // Start live detection loop if model is ready
+      if (modelStatus === 'ready') startDetectionLoop();
+
+      setSuccessBanner(
+        modelStatus === 'ready'
+          ? 'Live camera started — COCO-SSD AI detection active.'
+          : 'Live camera started — AI model loading in background…'
+      );
     } catch (err) {
-      console.warn('Camera access denied or failed:', err);
       let msg = 'Camera permission was denied or camera is in use.';
       if (err.name === 'NotAllowedError') {
         msg = 'Camera permission was denied. Please allow camera access in browser settings.';
@@ -126,7 +211,14 @@ export function WildlifeDetection({
     }
   };
 
+  const switchCamera = () => {
+    const next = facingMode === 'environment' ? 'user' : 'environment';
+    setFacingMode(next);
+    if (isCameraActive) startCamera(next);
+  };
+
   const stopCameraStream = () => {
+    stopDetectionLoop();
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((track) => track.stop());
       streamRef.current = null;
@@ -135,6 +227,7 @@ export function WildlifeDetection({
       videoRef.current.srcObject = null;
     }
     setIsCameraActive(false);
+    setLiveDetections([]);
   };
 
   const handleCaptureCamera = () => {
@@ -151,7 +244,8 @@ export function WildlifeDetection({
     setInputSource('camera-capture');
     stopCameraStream();
 
-    runWildlifeInference(dataUrl, 'Live Camera Stream');
+    // Run real inference on the captured frame
+    runWildlifeInference(canvas, dataUrl, 'Live Camera Capture');
   };
 
   // Image upload handling
@@ -222,15 +316,23 @@ export function WildlifeDetection({
     playMildWildlifeChime({ volume: soundVolume, force: true });
   };
 
-  // Main Wildlife Inference Engine
-  const runWildlifeInference = async (imgUrl = previewImage, sourceLabel = 'Uploaded Image') => {
+  // ── Main Wildlife Inference Engine (COCO-SSD + FastAPI fallback) ────────────
+  /**
+   * @param {HTMLCanvasElement|null} captureCanvas - canvas element for TF.js inference (from camera capture)
+   * @param {string} imgUrl - image URL for preview / thumbnail
+   * @param {string} sourceLabel - event source label
+   */
+  const runWildlifeInference = async (
+    captureCanvas = null,
+    imgUrl = previewImage,
+    sourceLabel = 'Uploaded Image'
+  ) => {
     setIsAnalyzing(true);
     setErrorMessage('');
     setSuccessBanner('');
 
     try {
-      let result = null;
-
+      // ── 1. Try FastAPI backend (optional, port 8000) ─────────────────────
       if (selectedFile) {
         try {
           const formData = new FormData();
@@ -241,68 +343,151 @@ export function WildlifeDetection({
             signal: AbortSignal.timeout(1500)
           });
           if (response.ok) {
-            result = await response.json();
+            const data = await response.json();
+            // Backend returned a real result
+            const speciesData = speciesList.find(s => s.id === data.speciesId) || speciesList[0];
+            await _logWildlifeResult(speciesData, data.confidence || speciesData.defaultConfidence, imgUrl, sourceLabel, false);
+            return;
           }
-        } catch (e) {
-          // Backend not running, use preset inference
+        } catch (_) { /* backend unavailable */ }
+      }
+
+      // ── 2. Run COCO-SSD in-browser if model is ready ─────────────────────
+      if (modelStatus === 'ready') {
+        // Determine what to run inference on
+        let inferenceTarget = null;
+
+        if (captureCanvas && captureCanvas instanceof HTMLCanvasElement) {
+          inferenceTarget = captureCanvas;
+        } else if (selectedFile) {
+          // Create an img element from the uploaded file
+          const imgEl = new Image();
+          imgEl.crossOrigin = 'anonymous';
+          await new Promise((res, rej) => {
+            imgEl.onload = res;
+            imgEl.onerror = rej;
+            imgEl.src = imgUrl;
+          });
+          inferenceTarget = imgEl;
+        }
+
+        if (inferenceTarget) {
+          const detections = await runWildlifeDetection(inferenceTarget);
+
+          if (detections.length === 0) {
+            // Honest no-detection result
+            setDetectedResult(null);
+            setErrorMessage(
+              'No wildlife detected in this image (COCO-SSD confidence below threshold). ' +
+              'Try a clearer, well-lit photo with the animal clearly visible.'
+            );
+            setIsAnalyzing(false);
+            return;
+          }
+
+          // Take top detection
+          const topDet = detections[0];
+          const speciesData = speciesList.find(s => s.id === topDet.speciesId) || speciesList[0];
+
+          // Draw bboxes on overlay if available (for captured frame shown as preview)
+          // For upload mode, skip bbox overlay as image is static
+
+          await _logWildlifeResult(
+            speciesData,
+            topDet.confidencePercent,
+            imgUrl,
+            sourceLabel,
+            topDet.isApproximate,
+            topDet.label
+          );
+          return;
         }
       }
 
-      if (!result) {
-        await new Promise((res) => setTimeout(res, 1100));
-        // If user uploaded a custom image, use preset data but flag it clearly as demo
-        const baseResult = activePreset || speciesList[0];
-        result = selectedFile
-          ? { ...baseResult, isDemoUpload: true }
-          : baseResult;
+      // ── 3. Preset mode (no upload, no model result needed) ───────────────
+      // Only show preset result when user explicitly clicked on a preset animal
+      if (inputSource === 'preset' && activePreset) {
+        await _logWildlifeResult(activePreset, activePreset.defaultConfidence, imgUrl, 'Preset Specimen', false);
+        return;
       }
 
-      setDetectedResult(result);
-
-      if (soundEnabled) {
-        playMildWildlifeChime({ volume: soundVolume });
+      // ── 4. Model loading fallback ────────────────────────────────────────
+      if (modelStatus === 'loading') {
+        setErrorMessage('AI model is still loading. Please wait a moment and try again.');
+        return;
       }
 
-      const newEvent = {
-        id: `WLD-${Math.floor(1000 + Math.random() * 9000)}`,
-        species: `${result.commonName} (${result.scientificName})`,
-        speciesCommon: result.commonName,
-        confidence: result.defaultConfidence || '95.4%',
-        timestamp: new Date().toLocaleString(),
-        source: sourceLabel,
-        location: incidentLocation,
-        status: 'Verified',
-        threatLevel: result.threatLevel,
-        isDemo: true,
-        thumbnail: imgUrl,
-        notes: result.typicalHabit
-      };
+      if (modelStatus === 'error') {
+        setErrorMessage('COCO-SSD model failed to load. Check internet connection and reload the page.');
+        return;
+      }
 
-      const updatedHistory = saveWildlifeEvent(newEvent);
-      setHistoryRecords(updatedHistory);
-
-      addNotification({
-        id: `NOTIF-${Date.now()}`,
-        type: 'wildlife',
-        title: `Wildlife Detected: ${result.commonName}`,
-        message: `Detected at ${incidentLocation}. Mild alert dispatched. Follow safe distance guidelines.`,
-        time: 'Just now',
-        severity: result.threatLevel === 'High' ? 'danger' : 'warning',
-        read: false
-      });
-
-      setSuccessBanner(
-        `Target Identified: ${result.commonName} (${result.defaultConfidence || '95.4%'}). Event logged to security ledger.`
-      );
-
-      if (onEventLogged) onEventLogged();
-    } catch (err) {
+      // Generic fallback for uploaded image when model unavailable
       setErrorMessage(
-        'Wildlife identification failed. Please retry.'
+        'No real AI model available. Connect internet to load COCO-SSD, or start the local FastAPI backend at port 8000.'
       );
+    } catch (err) {
+      console.error('Wildlife inference error:', err);
+      setErrorMessage('Wildlife identification failed. Please retry.');
     } finally {
       setIsAnalyzing(false);
     }
+  };
+
+  // Internal helper: persist and display a wildlife detection result
+  const _logWildlifeResult = async (
+    speciesData,
+    confidenceStr,
+    imgUrl,
+    sourceLabel,
+    isApproximate = false,
+    detectedLabel = null
+  ) => {
+    const resultToShow = {
+      ...speciesData,
+      detectedLabel,         // raw COCO label if approximate
+      isApproximate,         // flag for UI disclosure
+      defaultConfidence: confidenceStr,
+    };
+    setDetectedResult(resultToShow);
+
+    if (soundEnabled) {
+      playMildWildlifeChime({ volume: soundVolume });
+    }
+
+    const newEvent = {
+      id: `WLD-${Math.floor(1000 + Math.random() * 9000)}`,
+      species: `${speciesData.commonName} (${speciesData.scientificName})`,
+      speciesCommon: speciesData.commonName,
+      confidence: confidenceStr,
+      timestamp: new Date().toLocaleString(),
+      source: sourceLabel,
+      location: incidentLocation,
+      status: 'Verified',
+      threatLevel: speciesData.threatLevel,
+      isDemo: false,
+      thumbnail: imgUrl,
+      notes: speciesData.typicalHabit
+    };
+
+    const updatedHistory = saveWildlifeEvent(newEvent);
+    setHistoryRecords(updatedHistory);
+
+    addNotification({
+      id: `NOTIF-${Date.now()}`,
+      type: 'wildlife',
+      title: `Wildlife Detected: ${speciesData.commonName}`,
+      message: `Detected at ${incidentLocation}. Confidence: ${confidenceStr}. Follow safe distance guidelines.`,
+      time: 'Just now',
+      severity: speciesData.threatLevel === 'High' ? 'danger' : 'warning',
+      read: false
+    });
+
+    setSuccessBanner(
+      `Target Identified: ${speciesData.commonName} (${confidenceStr}). Event logged.`
+    );
+
+    if (onEventLogged) onEventLogged();
   };
 
   const filteredHistory = historyRecords.filter((rec) => {
@@ -359,6 +544,29 @@ export function WildlifeDetection({
           <p className="section-subtitle">
             Safeguarding agricultural acreage from nocturnal wildlife damage with non-invasive computer vision, harmless auditory chimes, and safe perimeter guidance.
           </p>
+        </div>
+
+        {/* AI Model Status Banner */}
+        <div className="ai-status-banner">
+          <div className="ai-status-left">
+            <span className={`status-indicator-dot ${
+              modelStatus === 'ready' ? 'online' :
+              modelStatus === 'loading' ? 'loading' :
+              modelStatus === 'error' ? 'error' : 'idle'
+            }`} />
+            <span>
+              <strong>Wildlife AI Engine (COCO-SSD):</strong>&nbsp;
+              {modelStatus === 'idle' && 'Idle — model will load on first use'}
+              {modelStatus === 'loading' && 'Loading TensorFlow.js COCO-SSD model…'}
+              {modelStatus === 'ready' && 'Model Ready — Real-time COCO-SSD detection active'}
+              {modelStatus === 'error' && 'Model load failed — check internet connection and reload'}
+            </span>
+          </div>
+          <span className="disclaimer-chip">
+            {modelStatus === 'loading' && <><Icon name="refresh" size={13} className="spin" /> Loading…</>}
+            {modelStatus === 'ready' && 'COCO-SSD TF.js • Live Inference'}
+            {(modelStatus === 'idle' || modelStatus === 'error') && 'Detection Unavailable'}
+          </span>
         </div>
 
         {/* Audio Alert Controls Toolbar */}
@@ -480,18 +688,35 @@ export function WildlifeDetection({
             </div>
 
             {/* Video / Image Display Area */}
-            <div className="viewfinder-viewport">
+            <div className="viewfinder-viewport" style={{ position: 'relative' }}>
               {/* Camera stream — always in DOM so videoRef is valid; hidden when inactive */}
-              <div className="camera-stream-wrap" style={{ display: isCameraActive ? 'block' : 'none' }}>
+              <div className="camera-stream-wrap" style={{ display: isCameraActive ? 'block' : 'none', position: 'relative' }}>
                 <video
                   ref={videoRef}
                   playsInline
                   autoPlay
                   muted
                   className="live-video-element"
+                  style={{ display: 'block', width: '100%', borderRadius: '8px' }}
+                />
+                {/* Real bounding box canvas overlay */}
+                <canvas
+                  ref={overlayCanvasRef}
+                  style={{
+                    position: 'absolute', top: 0, left: 0,
+                    width: '100%', height: '100%',
+                    pointerEvents: 'none', borderRadius: '8px'
+                  }}
                 />
                 <div className="camera-overlay-reticle">
-                  <span className="cam-hud-label">PERIMETER SURVEILLANCE RADAR</span>
+                  <span className="cam-hud-label">
+                    {modelStatus === 'ready' ? 'COCO-SSD LIVE DETECTION' : 'PERIMETER SURVEILLANCE'}
+                  </span>
+                  {liveDetections.length > 0 && (
+                    <span style={{ color: '#ef4444', fontWeight: 700, marginLeft: 10 }}>
+                      ⚠ {liveDetections.length} ANIMAL{liveDetections.length > 1 ? 'S' : ''} DETECTED
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -500,21 +725,30 @@ export function WildlifeDetection({
                 <div className="image-preview-wrap">
                   <img
                     src={previewImage}
-                    alt={inputSource === 'preset' && activePreset?.id === 'wild-boar' ? 'Wild boar near an agricultural field' : 'Wildlife Specimen'}
+                    alt="Wildlife Specimen"
                     className="preview-wildlife-img"
+                    onError={(e) => handleImageFallback(e, 'wildlife')}
                   />
 
-                  {/* Bounding box simulation over animal */}
-                  <div className="ai-bounding-box">
-                    <span className="bbox-label">
-                      {detectedResult?.commonName || 'ANIMAL'}: {detectedResult?.defaultConfidence || '95%'}
-                    </span>
-                  </div>
+                  {/* Show real detection label if available */}
+                  {detectedResult && !errorMessage && (
+                    <div className="ai-bounding-box">
+                      <span className="bbox-label">
+                        {detectedResult.detectedLabel || detectedResult.commonName}: {detectedResult.defaultConfidence}
+                      </span>
+                    </div>
+                  )}
 
                   {isAnalyzing && (
                     <div className="analyzing-backdrop">
                       <Icon name="refresh" size={28} className="spin" color="#ffffff" />
-                      <p>Running YOLOv8 Object Detection...</p>
+                      <p>
+                        {modelStatus === 'ready'
+                          ? 'Running COCO-SSD Object Detection…'
+                          : modelStatus === 'loading'
+                          ? 'Loading AI model…'
+                          : 'Analyzing image…'}
+                      </p>
                     </div>
                   )}
                 </div>
@@ -534,7 +768,16 @@ export function WildlifeDetection({
                     onClick={handleCaptureCamera}
                   >
                     <Icon name="camera" size={16} />
-                    Capture Frame & Analyze
+                    Capture & Analyze
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-outline"
+                    onClick={switchCamera}
+                    title="Switch between front and rear camera"
+                  >
+                    <Icon name="refresh" size={16} />
+                    Switch Camera
                   </button>
                   <button
                     type="button"
@@ -579,11 +822,15 @@ export function WildlifeDetection({
                   <button
                     type="button"
                     className="btn btn-primary btn-sm"
-                    onClick={() => runWildlifeInference(previewImage, selectedFile ? 'Uploaded Image' : 'Preset Specimen')}
-                    disabled={isAnalyzing}
+                    onClick={() => runWildlifeInference(null, previewImage, selectedFile ? 'Uploaded Image' : 'Preset Specimen')}
+                    disabled={isAnalyzing || (!selectedFile && inputSource !== 'preset')}
                   >
                     <Icon name="scan" size={16} />
-                    {isAnalyzing ? 'Identifying...' : 'Analyze Animal'}
+                    {isAnalyzing
+                      ? 'Analyzing…'
+                      : modelStatus === 'loading'
+                      ? 'Model Loading…'
+                      : 'Analyze Animal'}
                   </button>
 
                   {selectedFile && (
@@ -608,7 +855,7 @@ export function WildlifeDetection({
                   <button
                     type="button"
                     className="btn btn-glass btn-sm"
-                    onClick={startCamera}
+                    onClick={() => startCamera()}
                   >
                     <Icon name="video" size={16} />
                     Start Camera
@@ -651,12 +898,12 @@ export function WildlifeDetection({
           <div className="wildlife-alert-card">
             {detectedResult ? (
               <div className="threat-alert-box">
-                {/* Demo mode warning for uploaded images */}
-                {detectedResult.isDemoUpload && (
+                {/* Approximate mapping disclosure */}
+                {detectedResult.isApproximate && (
                   <div className="demo-mode-notice">
-                    <Icon name="alert-triangle" size={16} color="#d97706" />
+                    <Icon name="info" size={16} color="#0284c7" />
                     <span>
-                      <strong>Demo Mode:</strong> Wildlife detection is currently running in demonstration mode. A trained AI model is required for real animal identification. The result below is based on the currently selected preset species.
+                      <strong>AI Note:</strong> COCO-SSD detected a <em>{detectedResult.detectedLabel}</em> class object. Wild boar, deer, and macaques are not explicit COCO classes — the closest available class was matched. For species-specific detection, a custom model trained on agricultural wildlife images is recommended.
                     </span>
                   </div>
                 )}
@@ -684,8 +931,10 @@ export function WildlifeDetection({
 
                   <div className="meta-box">
                     <span className="m-label">Confidence Score</span>
-                    <strong className="m-val text-green">{detectedResult.defaultConfidence || '95.4%'}</strong>
-                    <span className="m-sub">YOLOv8 Edge Engine</span>
+                    <strong className="m-val text-green">{detectedResult.defaultConfidence || '—'}</strong>
+                    <span className="m-sub">
+                      {modelStatus === 'ready' ? 'COCO-SSD TF.js' : 'Preset Reference'}
+                    </span>
                   </div>
 
                   <div className="meta-box">
@@ -836,9 +1085,10 @@ export function WildlifeDetection({
                     <tr key={rec.id}>
                       <td>
                         <img
-                          src={rec.thumbnail || 'https://images.unsplash.com/photo-1727701773949-69e701bdb680?auto=format&fit=crop&w=100&q=80'}
+                          src={rec.thumbnail || DEFAULT_WILDLIFE_IMAGE}
                           alt={rec.species}
                           className="table-thumb"
+                          onError={(e) => handleImageFallback(e, 'wildlife')}
                           onClick={() => setSelectedEventModal(rec)}
                         />
                       </td>
@@ -915,9 +1165,10 @@ export function WildlifeDetection({
 
               <div className="event-modal-body">
                 <img
-                  src={selectedEventModal.thumbnail}
+                  src={selectedEventModal.thumbnail || DEFAULT_WILDLIFE_IMAGE}
                   alt={selectedEventModal.species}
                   className="modal-event-img"
+                  onError={(e) => handleImageFallback(e, 'wildlife')}
                 />
                 <div className="modal-event-fields">
                   <div className="m-field">

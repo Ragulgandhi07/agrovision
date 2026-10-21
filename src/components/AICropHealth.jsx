@@ -2,6 +2,12 @@ import React, { useState, useRef, useEffect } from 'react';
 import { siteData } from '../siteData';
 import { Icon } from './Icons';
 import { saveCropScan, addNotification } from '../utils/storage';
+import { handleImageFallback } from '../utils/imageFallbacks';
+import {
+  loadMobileNetModel,
+  subscribeMobileNetStatus,
+  runCropClassification,
+} from '../utils/tfModels';
 
 export function AICropHealth({ onScanSaved }) {
   const presets = siteData.cropDiseaseDatabase;
@@ -16,11 +22,20 @@ export function AICropHealth({ onScanSaved }) {
   const [isCameraActive, setIsCameraActive] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [facingMode, setFacingMode] = useState('environment');
+  const [modelStatus, setModelStatus] = useState('idle'); // idle|loading|ready|error
 
   const fileInputRef = useRef(null);
   const streamRef = useRef(null);
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
+
+  // Preload MobileNet on mount
+  useEffect(() => {
+    const unsub = subscribeMobileNetStatus(setModelStatus);
+    loadMobileNetModel().catch(() => {});
+    return unsub;
+  }, []);
 
   // Stop camera stream on unmount
   useEffect(() => {
@@ -29,10 +44,11 @@ export function AICropHealth({ onScanSaved }) {
     };
   }, []);
 
-  const startCamera = async () => {
+  const startCamera = async (overrideFacing) => {
     setCameraError('');
     setErrorMessage('');
     setSavedSuccess(false);
+    const requestedFacing = overrideFacing || facingMode;
 
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       setCameraError(
@@ -41,11 +57,17 @@ export function AICropHealth({ onScanSaved }) {
       return;
     }
 
+    // Stop existing stream before starting new one
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(t => t.stop());
+      streamRef.current = null;
+    }
+
     try {
       let stream;
       try {
         stream = await navigator.mediaDevices.getUserMedia({
-          video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'environment' },
+          video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: { ideal: requestedFacing } },
           audio: false
         });
       } catch (firstErr) {
@@ -86,6 +108,12 @@ export function AICropHealth({ onScanSaved }) {
       setCameraError(msg);
       setIsCameraActive(false);
     }
+  };
+
+  const switchCamera = () => {
+    const next = facingMode === 'environment' ? 'user' : 'environment';
+    setFacingMode(next);
+    if (isCameraActive) startCamera(next);
   };
 
   const stopCamera = () => {
@@ -211,14 +239,14 @@ export function AICropHealth({ onScanSaved }) {
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  // Run model inference simulation or check local backend
+  // Run model inference: FastAPI → MobileNet → preset fallback
   const handleRunAnalysis = async () => {
     setIsAnalyzing(true);
     setErrorMessage('');
     setSavedSuccess(false);
 
     try {
-      let backendSuccess = false;
+      // ── 1. Try FastAPI backend (optional, port 8000) ──────────────────────
       if (selectedFile) {
         try {
           const formData = new FormData();
@@ -228,9 +256,7 @@ export function AICropHealth({ onScanSaved }) {
             const mimeString = parts[0].split(':')[1].split(';')[0];
             const ab = new ArrayBuffer(byteString.length);
             const ia = new Uint8Array(ab);
-            for (let i = 0; i < byteString.length; i++) {
-              ia[i] = byteString.charCodeAt(i);
-            }
+            for (let i = 0; i < byteString.length; i++) ia[i] = byteString.charCodeAt(i);
             const blob = new Blob([ab], { type: mimeString });
             formData.append('file', blob, 'leaf-camera-capture.jpg');
           } else {
@@ -244,42 +270,104 @@ export function AICropHealth({ onScanSaved }) {
           });
           if (response.ok) {
             const data = await response.json();
-            setAnalysisResult({
-              ...data,
-              sampleImage: previewUrl
-            });
-            backendSuccess = true;
+            setAnalysisResult({ ...data, sampleImage: previewUrl });
+            return; // backend success
           }
-        } catch (e) {
-          backendSuccess = false;
+        } catch (_) { /* backend unavailable */ }
+      }
+
+      // ── 2. MobileNet in-browser classification for uploaded files ─────────
+      const isCustomImage = selectedFile &&
+        (activePreset.id === 'custom-upload' || activePreset.id === 'crop-camera-capture');
+
+      if (isCustomImage && modelStatus === 'ready') {
+        // Create an Image element from the file/data URL for inference
+        const imgEl = new Image();
+        await new Promise((resolve, reject) => {
+          imgEl.onload = resolve;
+          imgEl.onerror = reject;
+          imgEl.src = previewUrl;
+        });
+
+        const classResult = await runCropClassification(imgEl);
+
+        if (classResult.status === 'uncertain') {
+          setAnalysisResult({
+            id: 'mobilenet-uncertain',
+            crop: 'Leaf / Plant Specimen',
+            disease: 'Uncertain — Low Model Confidence',
+            confidence: `${(classResult.topConfidence * 100).toFixed(1)}%`,
+            severity: 'Unknown',
+            symptoms: classResult.message,
+            prevention: 'Ensure the photo is well-lit, close-up, and shows only the leaf clearly against a plain background.',
+            treatmentAdvice: classResult.disclaimer,
+            sampleImage: previewUrl,
+            isModelResult: true,
+            isUncertain: true,
+            timestamp: new Date().toLocaleString()
+          });
+          return;
         }
+
+        if (classResult.status === 'low_confidence') {
+          setAnalysisResult({
+            id: 'mobilenet-low',
+            crop: 'Plant Specimen',
+            disease: `Low Confidence: ${classResult.topLabel.split(',')[0]}`,
+            confidence: `${(classResult.topConfidence * 100).toFixed(1)}%`,
+            severity: 'Uncertain',
+            symptoms: classResult.message,
+            prevention: 'Use a clearer, closer leaf photo for better results. Ensure good lighting and minimal background.',
+            treatmentAdvice: classResult.disclaimer,
+            sampleImage: previewUrl,
+            isModelResult: true,
+            isLowConfidence: true,
+            timestamp: new Date().toLocaleString()
+          });
+          return;
+        }
+
+        // Good confidence — show real MobileNet result
+        const topClasses = classResult.allPredictions
+          .slice(0, 3)
+          .map(p => `${p.className.split(',')[0]} (${(p.probability * 100).toFixed(1)}%)`);
+
+        setAnalysisResult({
+          id: 'mobilenet-result',
+          crop: 'Leaf / Plant Specimen',
+          disease: `MobileNet Classification: ${classResult.topLabel.split(',')[0]}`,
+          confidence: classResult.topConfidencePercent,
+          severity: classResult.topConfidence > 0.75 ? 'Detectable' : 'Low',
+          symptoms: `Top visual classification: "${classResult.topLabel.split(',')[0]}" at ${classResult.topConfidencePercent} confidence. Top 3: ${topClasses.join('; ')}.`,
+          prevention: 'For clinical crop disease diagnosis, a custom PlantVillage-trained model is required. MobileNet identifies visual categories, not specific plant diseases.',
+          treatmentAdvice: classResult.disclaimer,
+          sampleImage: previewUrl,
+          isModelResult: true,
+          allPredictions: classResult.allPredictions,
+          timestamp: new Date().toLocaleString()
+        });
+        return;
       }
 
-      if (!backendSuccess) {
-        // High quality simulated diagnostic engine
-        await new Promise((res) => setTimeout(res, 1200));
-
-        const isCustom = activePreset.id === 'custom-upload' || activePreset.id === 'crop-camera-capture';
-        const result = isCustom
-          ? {
-              id: activePreset.id,
-              crop: 'Field Foliage Specimen',
-              disease: 'Early Blight (Alternaria solani) Detected',
-              confidence: '93.6%',
-              severity: 'Moderate',
-              symptoms: 'Target-spot concentric necrosis observed on foliar tissue with marginal chlorotic halo.',
-              prevention: 'Maintain leaf canopy aeration, water at root zone with drip lines, avoid overhead sprinkler wetting.',
-              treatmentAdvice: 'Apply organic Trichoderma harzianum soil drench or neem seed kernel extract (5%). Consult agronomist for targeted bio-fungicide.',
-              sampleImage: previewUrl,
-              isDemoUpload: true,
-              timestamp: new Date().toLocaleString()
-            }
-          : {
-              ...activePreset,
-              timestamp: new Date().toLocaleString()
-            };
-        setAnalysisResult(result);
+      // ── 3. Model loading / unavailable for uploaded image ─────────────────
+      if (isCustomImage && modelStatus === 'loading') {
+        setErrorMessage('AI model is still loading. Please wait a moment and try again.');
+        return;
       }
+
+      if (isCustomImage && modelStatus === 'error') {
+        setErrorMessage('MobileNet model failed to load. Check internet connection and reload.');
+        return;
+      }
+
+      // ── 4. Preset mode: use curated knowledge base result ─────────────────
+      await new Promise(res => setTimeout(res, 800));
+      const result = {
+        ...activePreset,
+        isPresetResult: true,
+        timestamp: new Date().toLocaleString()
+      };
+      setAnalysisResult(result);
     } catch (err) {
       setErrorMessage(
         'Image analysis failed. Please try again with a clear, well-lit leaf photograph.'
@@ -346,13 +434,23 @@ export function AICropHealth({ onScanSaved }) {
         {/* Honest AI Model Connection Status Banner */}
         <div className="ai-status-banner">
           <div className="ai-status-left">
-            <span className="status-indicator-dot online" />
+            <span className={`status-indicator-dot ${
+              modelStatus === 'ready' ? 'online' :
+              modelStatus === 'loading' ? 'loading' :
+              modelStatus === 'error' ? 'error' : 'idle'
+            }`} />
             <span>
-              <strong>AI Diagnostic Engine:</strong> Interactive Demonstration Mode Active • Ready for Local FastAPI PyTorch Backend (Port 8000)
+              <strong>Crop AI Engine (MobileNet v2):</strong>&nbsp;
+              {modelStatus === 'idle' && 'Idle — model will load on first use'}
+              {modelStatus === 'loading' && 'Loading TensorFlow.js MobileNet v2 model…'}
+              {modelStatus === 'ready' && 'Model Ready — Real in-browser classification active'}
+              {modelStatus === 'error' && 'Model load failed — check internet and reload'}
             </span>
           </div>
           <span className="disclaimer-chip">
-            General Guidance • Consult Agronomist for Chemical Dosages
+            {modelStatus === 'loading' && <><Icon name="refresh" size={13} className="spin" /> Loading…</>}
+            {modelStatus === 'ready' && 'MobileNet TF.js • Live Inference'}
+            {(modelStatus === 'idle' || modelStatus === 'error') && 'Preset Knowledge Base Mode'}
           </span>
         </div>
 
@@ -406,10 +504,7 @@ export function AICropHealth({ onScanSaved }) {
                   alt="Leaf Specimen"
                   className="viewfinder-img"
                   style={{ display: isCameraActive ? 'none' : 'block' }}
-                  onError={(e) => {
-                    e.target.onerror = null;
-                    e.target.src = presets[0].sampleImage;
-                  }}
+                  onError={(e) => handleImageFallback(e, 'crop')}
                 />
 
                 {/* Animated HUD Laser Reticle */}
@@ -473,6 +568,18 @@ export function AICropHealth({ onScanSaved }) {
                     </button>
                   )}
 
+                  {isCameraActive && (
+                    <button
+                      type="button"
+                      className="btn btn-outline btn-sm"
+                      onClick={switchCamera}
+                      title="Switch between front and rear camera"
+                    >
+                      <Icon name="refresh" size={16} />
+                      Switch Camera
+                    </button>
+                  )}
+
                   {!isCameraActive && (
                     <button
                       type="button"
@@ -493,7 +600,11 @@ export function AICropHealth({ onScanSaved }) {
                     disabled={isAnalyzing}
                   >
                     <Icon name="scan" size={16} />
-                    {isAnalyzing ? 'Analyzing Image...' : 'Run AI Leaf Diagnosis'}
+                    {isAnalyzing
+                      ? 'Analyzing Image…'
+                      : modelStatus === 'loading'
+                      ? 'Model Loading…'
+                      : 'Run AI Leaf Diagnosis'}
                   </button>
 
                   {selectedFile && !isCameraActive && (
@@ -561,11 +672,22 @@ export function AICropHealth({ onScanSaved }) {
                   </span>
                 </div>
 
-                {analysisResult.isDemoUpload && (
-                  <div className="demo-mode-notice" style={{ marginBottom: '14px' }}>
-                    <Icon name="info" size={16} />
+                {analysisResult.isModelResult && (
+                  <div className="demo-mode-notice" style={{ marginBottom: '14px', borderColor: '#0284c7' }}>
+                    <Icon name="info" size={16} color="#0284c7" />
                     <span>
-                      <strong>Interactive Simulation Mode:</strong> Diagnostic result simulated client-side. Start local Python FastAPI backend at port 8000 for live neural inference.
+                      <strong>Real AI Result (MobileNet v2):</strong> This is an actual TensorFlow.js model inference result, not a simulation.
+                      {analysisResult.isUncertain && ' Low confidence — image may not show a clear plant specimen.'}
+                      {analysisResult.isLowConfidence && ' Confidence is low — try a clearer, well-lit photo.'}
+                    </span>
+                  </div>
+                )}
+
+                {analysisResult.isPresetResult && (
+                  <div className="demo-mode-notice" style={{ marginBottom: '14px' }}>
+                    <Icon name="leaf" size={16} color="#16a34a" />
+                    <span>
+                      <strong>Curated Knowledge Base Result:</strong> This result is from the AgroVision crop disease reference database, not a live model inference on your uploaded image.
                     </span>
                   </div>
                 )}
