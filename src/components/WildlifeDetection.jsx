@@ -390,13 +390,31 @@ export function WildlifeDetection({
 
           // Take top detection
           const topDet = detections[0];
-          const speciesData = speciesList.find(s => s.id === topDet.speciesId) || speciesList[0];
+          const matchedPreset = speciesList.find(s => s.id === topDet.speciesId);
 
-          // Draw bboxes on overlay if available (for captured frame shown as preview)
-          // For upload mode, skip bbox overlay as image is static
+          const resultSpecies = matchedPreset ? {
+            ...matchedPreset,
+            commonName: topDet.label,
+            threatLevel: topDet.threatLevel || matchedPreset.threatLevel,
+          } : {
+            id: topDet.speciesId,
+            commonName: topDet.label,
+            scientificName: `Detected via COCO-SSD [class: ${topDet.cocoClass}]`,
+            threatLevel: topDet.threatLevel || 'Low',
+            defaultConfidence: topDet.confidencePercent,
+            typicalHabit: `Detected animal class "${topDet.cocoClass}" near farm border.`,
+            safetyGuidance: topDet.threatLevel === 'High'
+              ? 'Large animal spotted. Maintain distance and observe safe perimeter protocols.'
+              : 'Domestic or grazing animal spotted near crop border. Check perimeter fence.',
+            recommendedActions: [
+              'Check perimeter boundary and crop fence line',
+              'Observe animal direction from a safe location',
+              'Log incident in AgroVision event ledger'
+            ]
+          };
 
           await _logWildlifeResult(
-            speciesData,
+            resultSpecies,
             topDet.confidencePercent,
             imgUrl,
             sourceLabel,

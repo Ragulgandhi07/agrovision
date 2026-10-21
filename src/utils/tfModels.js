@@ -106,31 +106,77 @@ export async function loadMobileNetModel() {
 
 // ── COCO-SSD Class → AgroVision Species Mapping ──────────────────────────────
 /**
- * Maps COCO class names to AgroVision wildlife species IDs.
- * COCO-SSD does NOT have wild-boar or bonnet-macaque as explicit classes.
- * We use the closest available classes with honest labeling.
+ * Strict animal mapping for COCO-SSD (80 classes).
+ * COCO-SSD directly supports: elephant, bear, dog, cat, horse, sheep, cow, bird, zebra, giraffe.
+ * We ONLY detect real animal classes and report the exact detected class without relabeling unrelated animals as wild boars.
  */
-const COCO_TO_AGRO_SPECIES = {
-  // Direct matches
-  elephant: { id: 'asian-elephant',  label: 'Asian Elephant',          confidence_boost: 0 },
-  bear:     { id: 'wild-boar',        label: 'Wild Animal (Bear/Boar)', confidence_boost: 0 },
-
-  // Approximate mappings (disclosed to user)
-  cow:      { id: 'spotted-deer',     label: 'Grazing Animal (Cow/Deer)',  confidence_boost: -0.05 },
-  sheep:    { id: 'spotted-deer',     label: 'Grazing Animal (Sheep/Deer)', confidence_boost: -0.05 },
-  horse:    { id: 'spotted-deer',     label: 'Large Grazing Animal',       confidence_boost: -0.05 },
-  dog:      { id: 'bonnet-macaque',   label: 'Small Mammal (Dog/Primate)', confidence_boost: -0.08 },
-  cat:      { id: 'bonnet-macaque',   label: 'Small Mammal (Cat/Primate)', confidence_boost: -0.08 },
-  bird:     { id: null,               label: 'Bird',                       confidence_boost: -0.1  },
-  pig:      { id: 'wild-boar',        label: 'Wild Pig / Boar',           confidence_boost: 0 },
-
-  // Wildlife-adjacent
-  zebra:    { id: 'spotted-deer',     label: 'Striped/Spotted Grazing Animal', confidence_boost: -0.05 },
-  giraffe:  { id: 'asian-elephant',   label: 'Large Wild Animal',             confidence_boost: -0.05 },
+const COCO_ANIMAL_SPECIES = {
+  // Direct Indian wildlife & farm perimeter threats
+  elephant: {
+    id: 'asian-elephant',
+    label: 'Elephant (Elephas maximus)',
+    threatLevel: 'High',
+    isSupported: true,
+  },
+  bear: {
+    id: 'wild-animal',
+    label: 'Wild Bear / Large Carnivore',
+    threatLevel: 'High',
+    isSupported: true,
+  },
+  zebra: {
+    id: 'spotted-deer',
+    label: 'Wild Herbivore / Ungulate',
+    threatLevel: 'Low',
+    isSupported: true,
+  },
+  giraffe: {
+    id: 'large-herbivore',
+    label: 'Large Herbivore',
+    threatLevel: 'Medium',
+    isSupported: true,
+  },
+  // Domestic / Livestock (not wild boar, labeled honestly)
+  cow: {
+    id: 'livestock-cow',
+    label: 'Cattle / Cow (Grazing Stray)',
+    threatLevel: 'Low',
+    isSupported: false,
+  },
+  sheep: {
+    id: 'livestock-sheep',
+    label: 'Sheep / Goat (Grazing Stray)',
+    threatLevel: 'Low',
+    isSupported: false,
+  },
+  horse: {
+    id: 'livestock-horse',
+    label: 'Horse (Farmed Animal)',
+    threatLevel: 'Low',
+    isSupported: false,
+  },
+  dog: {
+    id: 'canine-stray',
+    label: 'Canine / Dog (Stray Animal)',
+    threatLevel: 'Low',
+    isSupported: false,
+  },
+  cat: {
+    id: 'feline-stray',
+    label: 'Feline / Cat',
+    threatLevel: 'Low',
+    isSupported: false,
+  },
+  bird: {
+    id: 'avian',
+    label: 'Bird / Avian Pest',
+    threatLevel: 'Low',
+    isSupported: false,
+  },
 };
 
-// Minimum confidence for a detection to be reported
-const MIN_WILDLIFE_CONFIDENCE = 0.45;
+// Strict confidence threshold (0.50) to prevent false positive flickering
+const MIN_WILDLIFE_CONFIDENCE = 0.50;
 
 // ── Wildlife Inference (COCO-SSD) ────────────────────────────────────────────
 /**
@@ -148,21 +194,22 @@ export async function runWildlifeDetection(imageElement) {
     const cls = pred.class.toLowerCase();
     const rawScore = pred.score;
 
-    if (!COCO_TO_AGRO_SPECIES[cls]) continue; // Not a wildlife-relevant class
+    if (!COCO_ANIMAL_SPECIES[cls]) continue; // Ignore non-animal objects (e.g. chairs, persons, cars)
 
-    const mapping = COCO_TO_AGRO_SPECIES[cls];
-    const adjustedScore = Math.max(0, rawScore + mapping.confidence_boost);
+    if (rawScore < MIN_WILDLIFE_CONFIDENCE) continue;
 
-    if (adjustedScore < MIN_WILDLIFE_CONFIDENCE) continue;
+    const animalMeta = COCO_ANIMAL_SPECIES[cls];
 
     results.push({
-      speciesId: mapping.id,
-      label: mapping.label,
-      confidence: adjustedScore,
-      confidencePercent: `${(adjustedScore * 100).toFixed(1)}%`,
+      speciesId: animalMeta.id,
+      label: animalMeta.label,
+      threatLevel: animalMeta.threatLevel,
+      isSupported: animalMeta.isSupported,
+      confidence: rawScore,
+      confidencePercent: `${(rawScore * 100).toFixed(1)}%`,
       cocoClass: cls,
       bbox: pred.bbox, // [x, y, width, height] in image pixels
-      isApproximate: cls !== 'elephant' && cls !== 'pig',
+      isApproximate: false,
     });
   }
 
