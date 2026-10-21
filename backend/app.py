@@ -118,16 +118,11 @@ async def predict_crop_disease(file: UploadFile = File(...)):
             "treatmentAdvice": "Apply organic Trichoderma harzianum or consult extension officer for copper fungicide spray."
         }
 
-    # Integration-ready fallback response when custom model weights are pending
-    return {
-        "crop": "Tomato",
-        "disease": "Early Blight (Alternaria solani)",
-        "confidence": "94.8%",
-        "severity": "Moderate",
-        "symptoms": "Concentric dark brown rings ('target spots') on older leaves, surrounded by yellow chlorotic halos.",
-        "prevention": "Practice 3-year crop rotation with non-solanaceous crops. Stake plants for improved canopy airflow.",
-        "treatmentAdvice": "Apply organic Trichoderma harzianum soil drench or 5% neem seed kernel extract. Consult local KVK agronomist."
-    }
+    # No real model loaded — return 503 so the frontend falls through to TF.js in-browser inference
+    raise HTTPException(
+        status_code=503,
+        detail="Crop disease model not loaded. Frontend will use in-browser MobileNet inference."
+    )
 
 
 @app.post("/api/predict-wildlife")
@@ -172,20 +167,11 @@ async def predict_wildlife(file: UploadFile = File(...)):
                 "allDetections": detections
             }
 
-    # Default integration-ready demo response
-    return {
-        "commonName": "Wild Boar",
-        "scientificName": "Sus scrofa",
-        "defaultConfidence": "94.6%",
-        "threatLevel": "Medium",
-        "typicalHabit": "Nocturnal root-foraging; damages tuber crops, groundnuts, potatoes, and maize stalks.",
-        "safetyGuidance": "Keep a safe distance from the animal. Avoid approaching or cornering it. Use reflective flashers, auditory buzzers, or bio-fencing. Do not attempt direct contact.",
-        "recommendedActions": [
-            "Inspect perimeter trenches and bio-fencing borders",
-            "Activate mild non-lethal acoustic deterrent",
-            "Record incident location for forest department boundary log"
-        ]
-    }
+    # No real model loaded — return 503 so the frontend falls through to TF.js COCO-SSD inference
+    raise HTTPException(
+        status_code=503,
+        detail="Wildlife detection model not loaded. Frontend will use in-browser COCO-SSD inference."
+    )
 
 
 @app.get("/api/sensor-telemetry")
