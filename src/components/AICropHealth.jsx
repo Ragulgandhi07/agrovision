@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { siteData } from '../siteData';
 import { Icon } from './Icons';
 import { saveCropScan, addNotification } from '../utils/storage';
@@ -24,11 +24,13 @@ export function AICropHealth({ onScanSaved }) {
   const [isDragging, setIsDragging] = useState(false);
   const [facingMode, setFacingMode] = useState('environment');
   const [modelStatus, setModelStatus] = useState('idle'); // idle|loading|ready|error
+  const [liveCropResult, setLiveCropResult] = useState(null); // Real-time continuous prediction
 
   const fileInputRef = useRef(null);
   const streamRef = useRef(null);
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
+  const cropDetectionLoopRef = useRef(null);
 
   // Preload MobileNet on mount
   useEffect(() => {
@@ -37,12 +39,55 @@ export function AICropHealth({ onScanSaved }) {
     return unsub;
   }, []);
 
-  // Stop camera stream on unmount
+  // Stop camera stream & live loop on unmount
   useEffect(() => {
     return () => {
-      stopCamera();
+      if (cropDetectionLoopRef.current) {
+        clearInterval(cropDetectionLoopRef.current);
+        cropDetectionLoopRef.current = null;
+      }
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(t => t.stop());
+        streamRef.current = null;
+      }
+      if (videoRef.current) videoRef.current.srcObject = null;
     };
   }, []);
+
+  // ── Live Crop Detection Loop ──────────────────────────────────────────────
+  const stopCropDetectionLoop = () => {
+    if (cropDetectionLoopRef.current) {
+      clearInterval(cropDetectionLoopRef.current);
+      cropDetectionLoopRef.current = null;
+    }
+    setLiveCropResult(null);
+  };
+
+  const startCropDetectionLoop = useCallback(() => {
+    if (cropDetectionLoopRef.current) return;
+    if (modelStatus !== 'ready') return;
+
+    cropDetectionLoopRef.current = setInterval(async () => {
+      const video = videoRef.current;
+      if (!video || video.readyState < 2) return;
+
+      try {
+        const classResult = await runCropClassification(video);
+        if (classResult) {
+          setLiveCropResult(classResult);
+        }
+      } catch (_) {
+        // Frame dropped or model busy
+      }
+    }, 800); // 800ms throttle for smooth continuous inference without freezing UI
+  }, [modelStatus]);
+
+  // Restart live loop when model becomes ready while camera is active
+  useEffect(() => {
+    if (isCameraActive && modelStatus === 'ready' && !cropDetectionLoopRef.current) {
+      startCropDetectionLoop();
+    }
+  }, [isCameraActive, modelStatus, startCropDetectionLoop]);
 
   const startCamera = async (overrideFacing) => {
     setCameraError('');
@@ -57,7 +102,8 @@ export function AICropHealth({ onScanSaved }) {
       return;
     }
 
-    // Stop existing stream before starting new one
+    // Stop existing stream and loop before starting new one
+    stopCropDetectionLoop();
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(t => t.stop());
       streamRef.current = null;
@@ -93,6 +139,11 @@ export function AICropHealth({ onScanSaved }) {
           try { await videoRef.current.play(); } catch (_) {}
         }
       }, 50);
+
+      // Start continuous AI analysis if model is ready
+      if (modelStatus === 'ready') {
+        startCropDetectionLoop();
+      }
     } catch (err) {
       console.warn('Crop camera access error:', err);
       let msg = 'Camera permission denied or camera is in use.';
@@ -117,6 +168,7 @@ export function AICropHealth({ onScanSaved }) {
   };
 
   const stopCamera = () => {
+    stopCropDetectionLoop();
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((track) => track.stop());
       streamRef.current = null;
@@ -524,9 +576,24 @@ export function AICropHealth({ onScanSaved }) {
                 )}
 
                 {isCameraActive && (
-                  <div className="analyzing-overlay-badge" style={{ background: 'rgba(22, 163, 74, 0.85)' }}>
-                    <span className="live-pulse-dot camera-on" style={{ marginRight: '6px' }} />
-                    <span>Live Crop Viewfinder Active</span>
+                  <div className="analyzing-overlay-badge" style={{ background: 'rgba(22, 163, 74, 0.9)', maxWidth: '92%', whiteSpace: 'normal', textAlign: 'left', padding: '6px 12px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: liveCropResult ? '2px' : 0 }}>
+                      <span className="live-pulse-dot camera-on" />
+                      <strong>REAL-TIME AI CROP SCANNER</strong>
+                    </div>
+                    {liveCropResult ? (
+                      <div style={{ fontSize: '0.82rem', marginTop: '3px', lineHeight: 1.3 }}>
+                        <span>Top Class: <strong>{liveCropResult.topLabel?.split(',')[0]}</strong></span>
+                        <span style={{ marginLeft: '8px', opacity: 0.9 }}>({(liveCropResult.topConfidence * 100).toFixed(1)}%)</span>
+                        <div style={{ fontSize: '0.75rem', opacity: 0.85, marginTop: '2px' }}>
+                          Status: {liveCropResult.status === 'detected' ? '✓ Characteristic Match' : '⚠ Searching / Low confidence'}
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={{ fontSize: '0.78rem', opacity: 0.85 }}>
+                        {modelStatus === 'ready' ? 'Analyzing live frames continuously...' : 'Loading AI model...'}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

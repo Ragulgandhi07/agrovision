@@ -127,10 +127,13 @@ export function WildlifeDetection({
             video.videoWidth  || 640,
             video.videoHeight || 480
           );
+          if (soundEnabled) {
+            playMildWildlifeChime({ volume: soundVolume });
+          }
         }
       } catch (_) { /* model busy or frame unavailable */ }
     }, 700); // throttled to ~1.4 fps for performance
-  }, [modelStatus]);
+  }, [modelStatus, soundEnabled, soundVolume]);
 
   // Re-start loop when model becomes ready while camera is active
   useEffect(() => {
