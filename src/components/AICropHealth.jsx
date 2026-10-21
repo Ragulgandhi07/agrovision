@@ -328,13 +328,11 @@ export function AICropHealth({ onScanSaved }) {
         } catch (_) { /* backend unavailable */ }
       }
 
-      // ── 2. MobileNet in-browser classification for uploaded files ─────────
-      const isCustomImage = selectedFile &&
-        (activePreset.id === 'custom-upload' || activePreset.id === 'crop-camera-capture');
-
-      if (isCustomImage && modelStatus === 'ready') {
-        // Create an Image element from the file/data URL for inference
+      // ── 2. Real MobileNet in-browser classification for both uploads and presets ──
+      if (modelStatus === 'ready') {
+        // Create an Image element from the preview URL
         const imgEl = new Image();
+        imgEl.crossOrigin = 'anonymous';
         await new Promise((resolve, reject) => {
           imgEl.onload = resolve;
           imgEl.onerror = reject;
@@ -345,7 +343,7 @@ export function AICropHealth({ onScanSaved }) {
 
         if (classResult.status === 'uncertain') {
           setAnalysisResult({
-            id: 'mobilenet-uncertain',
+            id: `diag-${Date.now()}`,
             crop: 'Leaf / Plant Specimen',
             disease: 'Uncertain — Low Model Confidence',
             confidence: `${(classResult.topConfidence * 100).toFixed(1)}%`,
@@ -363,7 +361,7 @@ export function AICropHealth({ onScanSaved }) {
 
         if (classResult.status === 'low_confidence') {
           setAnalysisResult({
-            id: 'mobilenet-low',
+            id: `diag-${Date.now()}`,
             crop: 'Plant Specimen',
             disease: `Low Confidence: ${classResult.topLabel.split(',')[0]}`,
             confidence: `${(classResult.topConfidence * 100).toFixed(1)}%`,
@@ -385,9 +383,9 @@ export function AICropHealth({ onScanSaved }) {
           .map(p => `${p.className.split(',')[0]} (${(p.probability * 100).toFixed(1)}%)`);
 
         setAnalysisResult({
-          id: 'mobilenet-result',
+          id: `diag-${Date.now()}`,
           crop: 'Leaf / Plant Specimen',
-          disease: `MobileNet Classification: ${classResult.topLabel.split(',')[0]}`,
+          disease: `Visual Classification: ${classResult.topLabel.split(',')[0]}`,
           confidence: classResult.topConfidencePercent,
           severity: classResult.topConfidence > 0.75 ? 'Detectable' : 'Low',
           symptoms: `Top visual classification: "${classResult.topLabel.split(',')[0]}" at ${classResult.topConfidencePercent} confidence. Top 3: ${topClasses.join('; ')}.`,
@@ -401,25 +399,16 @@ export function AICropHealth({ onScanSaved }) {
         return;
       }
 
-      // ── 3. Model loading / unavailable for uploaded image ─────────────────
-      if (isCustomImage && modelStatus === 'loading') {
+      // ── 3. Model loading / error states ─────────────────────────────────
+      if (modelStatus === 'loading') {
         setErrorMessage('AI model is still loading. Please wait a moment and try again.');
         return;
       }
 
-      if (isCustomImage && modelStatus === 'error') {
+      if (modelStatus === 'error') {
         setErrorMessage('MobileNet model failed to load. Check internet connection and reload.');
         return;
       }
-
-      // ── 4. Preset mode: use curated knowledge base result ─────────────────
-      await new Promise(res => setTimeout(res, 800));
-      const result = {
-        ...activePreset,
-        isPresetResult: true,
-        timestamp: new Date().toLocaleString()
-      };
-      setAnalysisResult(result);
     } catch (err) {
       setErrorMessage(
         'Image analysis failed. Please try again with a clear, well-lit leaf photograph.'

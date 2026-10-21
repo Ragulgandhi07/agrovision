@@ -362,8 +362,8 @@ export function WildlifeDetection({
 
         if (captureCanvas && captureCanvas instanceof HTMLCanvasElement) {
           inferenceTarget = captureCanvas;
-        } else if (selectedFile) {
-          // Create an img element from the uploaded file
+        } else {
+          // Create an img element from the active image (upload or preset)
           const imgEl = new Image();
           imgEl.crossOrigin = 'anonymous';
           await new Promise((res, rej) => {
@@ -381,7 +381,7 @@ export function WildlifeDetection({
             // Honest no-detection result
             setDetectedResult(null);
             setErrorMessage(
-              'No wildlife detected in this image (COCO-SSD confidence below threshold). ' +
+              'No supported wildlife detected in this image (COCO-SSD confidence below threshold). ' +
               'Try a clearer, well-lit photo with the animal clearly visible.'
             );
             setIsAnalyzing(false);
@@ -423,13 +423,6 @@ export function WildlifeDetection({
           );
           return;
         }
-      }
-
-      // ── 3. Preset mode (no upload, no model result needed) ───────────────
-      // Only show preset result when user explicitly clicked on a preset animal
-      if (inputSource === 'preset' && activePreset) {
-        await _logWildlifeResult(activePreset, activePreset.defaultConfidence, imgUrl, 'Preset Specimen', false);
-        return;
       }
 
       // ── 4. Model loading fallback ────────────────────────────────────────
