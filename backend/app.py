@@ -107,21 +107,58 @@ async def predict_crop_disease(file: UploadFile = File(...)):
 
         confidence_pct = f"{(top_prob.item() * 100):.1f}%"
         predicted_idx = top_idx.item()
-        # Map predicted index to disease label dictionary
-        return {
-            "crop": "Tomato",
-            "disease": "Early Blight (Alternaria solani)",
-            "confidence": confidence_pct,
-            "severity": "Moderate",
-            "symptoms": "Dark brown concentric target rings on older foliage with chlorotic halos.",
-            "prevention": "Rotate crops and apply drip irrigation at root zones to keep foliage dry.",
-            "treatmentAdvice": "Apply organic Trichoderma harzianum or consult extension officer for copper fungicide spray."
+        
+        disease_database = {
+            0: {
+                "crop": "Tomato",
+                "disease": "Early Blight (Alternaria solani)",
+                "severity": "Moderate",
+                "symptoms": "Dark brown concentric target rings on older foliage with chlorotic halos.",
+                "prevention": "Rotate crops and apply drip irrigation at root zones to keep foliage dry.",
+                "treatmentAdvice": "Apply organic Trichoderma harzianum or consult extension officer for copper fungicide spray."
+            },
+            1: {
+                "crop": "Potato",
+                "disease": "Late Blight (Phytophthora infestans)",
+                "severity": "High",
+                "symptoms": "Water-soaked dark lesions on leaf tips with white fungal sporulation.",
+                "prevention": "Plant certified seed tubers and ensure rapid foliage drying.",
+                "treatmentAdvice": "Ensure furrow drainage. Consult extension agronomist for copper hydroxide spray."
+            },
+            2: {
+                "crop": "Paddy / Rice",
+                "disease": "Rice Leaf Blast (Magnaporthe oryzae)",
+                "severity": "High",
+                "symptoms": "Spindle-shaped lesions with gray centers and reddish-brown borders.",
+                "prevention": "Avoid excess nitrogen fertilizer. Seed treatment with Pseudomonas fluorescens.",
+                "treatmentAdvice": "Apply bio-control formulation Pseudomonas fluorescens @ 2.5 kg/ha."
+            },
+            3: {
+                "crop": "Maize / Corn",
+                "disease": "Common Rust (Puccinia sorghi)",
+                "severity": "Moderate",
+                "symptoms": "Circular to elongate golden-brown to cinnamon-brown pustules on leaves.",
+                "prevention": "Select rust-resistant hybrid cultivars and plant early.",
+                "treatmentAdvice": "Maintain optimal potassium nutrition and consult for bio-spray."
+            },
+            4: {
+                "crop": "Field Crop",
+                "disease": "Healthy Foliage (No Pathogen Detected)",
+                "severity": "None",
+                "symptoms": "Uniform healthy green canopy with balanced chlorophyll.",
+                "prevention": "Maintain balanced fertilization and regular field scouting.",
+                "treatmentAdvice": "No chemical or bio-fungicide required."
+            }
         }
+        
+        matched = disease_database.get(predicted_idx, disease_database[0]).copy()
+        matched["confidence"] = confidence_pct
+        return matched
 
-    # No real model loaded — return 503 so the frontend falls through to TF.js in-browser inference
+    # No custom model loaded — return 503 so frontend uses transparent in-browser inference
     raise HTTPException(
         status_code=503,
-        detail="Crop disease model not loaded. Frontend will use in-browser MobileNet inference."
+        detail="Crop disease custom model not loaded in backend/weights/. Frontend will use client-side MobileNet inference."
     )
 
 

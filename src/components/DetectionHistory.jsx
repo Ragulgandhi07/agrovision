@@ -9,7 +9,12 @@ import {
   clearCropHistory,
   exportToCSV
 } from '../utils/storage';
-import { handleImageFallback, DEFAULT_CROP_IMAGE, DEFAULT_WILDLIFE_IMAGE } from '../utils/imageFallbacks';
+import {
+  handleImageFallback,
+  DEFAULT_CROP_IMAGE,
+  DEFAULT_WILDLIFE_IMAGE,
+  getWildlifeSpeciesImage
+} from '../utils/imageFallbacks';
 
 export function DetectionHistory({ refreshTrigger }) {
   const [wildlifeList, setWildlifeList] = useState([]);
@@ -188,10 +193,32 @@ export function DetectionHistory({ refreshTrigger }) {
                 </tr>
               </thead>
               <tbody>
-                {filteredRecords.length === 0 ? (
+                {combinedRecords.length === 0 ? (
                   <tr>
                     <td colSpan="8" className="empty-ledger-td">
-                      <Icon name="check-circle" size={32} color="#16a34a" />
+                      <div className="empty-history-box" style={{ padding: '36px 20px', textAlign: 'center' }}>
+                        <Icon name="clock" size={38} color="#16a34a" />
+                        <h4 style={{ margin: '14px 0 6px', fontSize: '1.1rem', fontWeight: 600, color: '#f8fafc' }}>
+                          No detection history yet. Upload an image to begin.
+                        </h4>
+                        <p style={{ margin: '0 auto 16px', maxWidth: '480px', fontSize: '0.88rem', color: '#94a3b8' }}>
+                          Upload or capture field images in Wildlife Detection or Crop Health to run AI inference and populate your incident ledger.
+                        </p>
+                        <div style={{ display: 'inline-flex', gap: '10px' }}>
+                          <a href="#wildlife" className="btn btn-warning-glass btn-sm">
+                            <Icon name="shield-alert" size={14} /> Wildlife Detection
+                          </a>
+                          <a href="#crop-disease" className="btn btn-primary btn-sm">
+                            <Icon name="leaf" size={14} /> Crop Disease Detection
+                          </a>
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                ) : filteredRecords.length === 0 ? (
+                  <tr>
+                    <td colSpan="8" className="empty-ledger-td">
+                      <Icon name="search" size={32} color="#94a3b8" />
                       <p>No detection records match your filter criteria.</p>
                     </td>
                   </tr>
@@ -200,10 +227,10 @@ export function DetectionHistory({ refreshTrigger }) {
                     <tr key={item.id} className="ledger-row">
                       <td>
                         <img
-                          src={item.image || item.thumbnail || (item.category === 'wildlife' ? DEFAULT_WILDLIFE_IMAGE : DEFAULT_CROP_IMAGE)}
+                          src={item.image || item.thumbnail || (item.category === 'wildlife' ? getWildlifeSpeciesImage(item.speciesCommon || item.species || item.title) : DEFAULT_CROP_IMAGE)}
                           alt={item.title}
                           className="ledger-thumb"
-                          onError={(e) => handleImageFallback(e, item.category === 'wildlife' ? 'wildlife' : 'crop')}
+                          onError={(e) => handleImageFallback(e, item.category === 'wildlife' ? 'wildlife' : 'crop', item.speciesCommon || item.species || item.title)}
                           onClick={() => setSelectedItem(item)}
                         />
                       </td>
@@ -283,10 +310,10 @@ export function DetectionHistory({ refreshTrigger }) {
 
               <div className="event-modal-body">
                 <img
-                  src={selectedItem.image || selectedItem.thumbnail || (selectedItem.category === 'wildlife' ? DEFAULT_WILDLIFE_IMAGE : DEFAULT_CROP_IMAGE)}
+                  src={selectedItem.image || selectedItem.thumbnail || (selectedItem.category === 'wildlife' ? getWildlifeSpeciesImage(selectedItem.speciesCommon || selectedItem.species || selectedItem.title) : DEFAULT_CROP_IMAGE)}
                   alt={selectedItem.title}
                   className="modal-event-img"
-                  onError={(e) => handleImageFallback(e, selectedItem.category === 'wildlife' ? 'wildlife' : 'crop')}
+                  onError={(e) => handleImageFallback(e, selectedItem.category === 'wildlife' ? 'wildlife' : 'crop', selectedItem.speciesCommon || selectedItem.species || selectedItem.title)}
                 />
                 <div className="modal-event-fields">
                   <div className="m-field full">

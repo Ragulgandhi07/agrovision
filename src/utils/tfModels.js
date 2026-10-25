@@ -1,31 +1,34 @@
 /**
- * AgroVision – TensorFlow.js Model Loader & Inference Utilities
+ * AgroVision – TensorFlow.js Model Loader & Real Inference Utilities
  *
- * MODELS USED:
- *   Wildlife: COCO-SSD (object detection, 80 COCO classes, includes "elephant", "bear", "cow", etc.)
- *   Crop:     MobileNet v2 (ImageNet classification — general purpose, not disease-specific)
+ * Explicitly initializes @tensorflow/tfjs backend (WebGL / CPU)
+ * Loads COCO-SSD from local public assets (/models/coco-ssd/model.json) with remote fallback.
  *
- * HONEST DISCLOSURE:
- *   - COCO-SSD can detect elephants directly. Wild boar, spotted deer, and macaques are approximated
- *     from the closest COCO classes (pig, sheep/deer, bear) with clear labeling.
- *   - MobileNet is NOT trained on plant diseases. It identifies general visual categories.
- *     For clinical crop disease diagnosis, a custom model trained on PlantVillage dataset is required.
- *     See README for training instructions.
- *   - Results below 60% confidence are reported as "Low confidence / Uncertain".
+ * MODELS:
+ * 1. Wildlife Detection: COCO-SSD (Object detection on 80 COCO classes)
+ *    Directly detects: elephant, bear, zebra, giraffe, cow, sheep, horse, dog, cat, bird, person, car, etc.
+ *    Honesty: COCO-SSD standard weights do NOT contain custom classes for Wild Boar, Spotted Deer,
+ *    or Macaque. The system reports the exact detected COCO class without inventing fake classifications.
+ *
+ * 2. Crop Health Screening: MobileNet v2 (ImageNet 1000 categories)
+ *    Honesty: MobileNet is a general-purpose vision classifier. It identifies visual categories
+ *    and general botanical traits, NOT clinical microscopic foliar plant diseases.
+ *    Clinical plant pathology requires a custom PlantVillage-trained model (e.g. crop_pathology_resnet.pth).
  */
 
-// ── Model State ──────────────────────────────────────────────────────────────
+import * as tf from '@tensorflow/tfjs';
+
+// ── Model Instances & Status Tracking ─────────────────────────────────────────
 let cocoModel = null;
 let mobileNetModel = null;
-let cocoStatus = 'idle';   // idle | loading | ready | error
+let cocoStatus = 'idle';        // idle | loading | ready | error
 let mobileNetStatus = 'idle';
 
-// Listeners for status updates
 const cocoListeners = new Set();
 const mobileNetListeners = new Set();
 
 function notifyListeners(set, status) {
-  set.forEach(fn => {
+  set.forEach((fn) => {
     try { fn(status); } catch (_) {}
   });
 }
@@ -45,15 +48,15 @@ export function subscribeMobileNetStatus(fn) {
 export function getCocoStatus() { return cocoStatus; }
 export function getMobileNetStatus() { return mobileNetStatus; }
 
-// ── COCO-SSD Model Loader ─────────────────────────────────────────────────────
+// ── COCO-SSD Loader ───────────────────────────────────────────────────────────
 export async function loadCocoModel() {
   if (cocoModel) return cocoModel;
+
   if (cocoStatus === 'loading') {
-    // Wait for existing load to finish
     return new Promise((resolve, reject) => {
-      const unsub = subscribeCocoStatus(s => {
+      const unsub = subscribeCocoStatus((s) => {
         if (s === 'ready') { unsub(); resolve(cocoModel); }
-        if (s === 'error') { unsub(); reject(new Error('COCO-SSD failed to load')); }
+        if (s === 'error') { unsub(); reject(new Error('COCO-SSD model failed to load.')); }
       });
     });
   }
@@ -62,7 +65,26 @@ export async function loadCocoModel() {
   notifyListeners(cocoListeners, 'loading');
 
   try {
+    // 1. Ensure TensorFlow.js backend is fully initialized
+    await tf.ready();
+
     const cocoSsd = await import('@tensorflow-models/coco-ssd');
+
+    // 2. Try loading from local bundled assets in /models/coco-ssd/ (offline-ready, zero latency)
+    try {
+      const localUrl = typeof window !== 'undefined' && window.location?.origin
+        ? new URL('/models/coco-ssd/model.json', window.location.origin).href
+        : '/models/coco-ssd/model.json';
+
+      cocoModel = await cocoSsd.load({ modelUrl: localUrl });
+      cocoStatus = 'ready';
+      notifyListeners(cocoListeners, 'ready');
+      return cocoModel;
+    } catch (localErr) {
+      console.warn('Local COCO-SSD model load notice, attempting remote repository:', localErr.message);
+    }
+
+    // 3. Fallback to standard Google Cloud Storage weights
     cocoModel = await cocoSsd.load({ base: 'lite_mobilenet_v2' });
     cocoStatus = 'ready';
     notifyListeners(cocoListeners, 'ready');
@@ -75,14 +97,15 @@ export async function loadCocoModel() {
   }
 }
 
-// ── MobileNet Model Loader ────────────────────────────────────────────────────
+// ── MobileNet Loader ──────────────────────────────────────────────────────────
 export async function loadMobileNetModel() {
   if (mobileNetModel) return mobileNetModel;
+
   if (mobileNetStatus === 'loading') {
     return new Promise((resolve, reject) => {
-      const unsub = subscribeMobileNetStatus(s => {
+      const unsub = subscribeMobileNetStatus((s) => {
         if (s === 'ready') { unsub(); resolve(mobileNetModel); }
-        if (s === 'error') { unsub(); reject(new Error('MobileNet failed to load')); }
+        if (s === 'error') { unsub(); reject(new Error('MobileNet model failed to load.')); }
       });
     });
   }
@@ -91,6 +114,7 @@ export async function loadMobileNetModel() {
   notifyListeners(mobileNetListeners, 'loading');
 
   try {
+    await tf.ready();
     const mn = await import('@tensorflow-models/mobilenet');
     mobileNetModel = await mn.load({ version: 2, alpha: 1.0 });
     mobileNetStatus = 'ready';
@@ -104,183 +128,201 @@ export async function loadMobileNetModel() {
   }
 }
 
-// ── COCO-SSD Class → AgroVision Species Mapping ──────────────────────────────
-/**
- * Strict animal mapping for COCO-SSD (80 classes).
- * COCO-SSD directly supports: elephant, bear, dog, cat, horse, sheep, cow, bird, zebra, giraffe.
- * We ONLY detect real animal classes and report the exact detected class without relabeling unrelated animals as wild boars.
- */
-const COCO_ANIMAL_SPECIES = {
-  // Direct Indian wildlife & farm perimeter threats
+// ── COCO-SSD Animal Class Metadata ───────────────────────────────────────────
+export const COCO_ANIMAL_CLASSES = {
   elephant: {
-    id: 'asian-elephant',
-    label: 'Elephant (Elephas maximus)',
+    speciesId: 'asian-elephant',
+    label: 'Asian Elephant (Elephas maximus)',
     threatLevel: 'High',
-    isSupported: true,
+    isSupportedWildlife: true,
+    guidance: 'CRITICAL PERIMETER THREAT: Elephant detected. Maintain safe perimeter (> 100m). Alert neighboring plots and notify Forest Dept RRT.'
   },
   bear: {
-    id: 'wild-animal',
+    speciesId: 'wild-bear',
     label: 'Wild Bear / Large Carnivore',
     threatLevel: 'High',
-    isSupported: true,
+    isSupportedWildlife: true,
+    guidance: 'DANGER: Large predator spotted near farm perimeter. Keep clear of dense brush and do not approach.'
   },
   zebra: {
-    id: 'spotted-deer',
+    speciesId: 'wild-herbivore',
     label: 'Wild Herbivore / Ungulate',
     threatLevel: 'Low',
-    isSupported: true,
+    isSupportedWildlife: true,
+    guidance: 'Wild grazing animal detected. Check border fence and use mild solar flashers.'
   },
   giraffe: {
-    id: 'large-herbivore',
+    speciesId: 'large-herbivore',
     label: 'Large Herbivore',
     threatLevel: 'Medium',
-    isSupported: true,
+    isSupportedWildlife: true,
+    guidance: 'Large herbivore detected near canopy trees. Monitor boundary fence.'
   },
-  // Domestic / Livestock (not wild boar, labeled honestly)
   cow: {
-    id: 'livestock-cow',
-    label: 'Cattle / Cow (Grazing Stray)',
+    speciesId: 'livestock-cow',
+    label: 'Cattle / Cow (Stray Livestock)',
     threatLevel: 'Low',
-    isSupported: false,
+    isSupportedWildlife: false,
+    guidance: 'Domestic cattle grazing near crop boundary. Check perimeter gates and guide animal away calmly.'
   },
   sheep: {
-    id: 'livestock-sheep',
-    label: 'Sheep / Goat (Grazing Stray)',
+    speciesId: 'livestock-sheep',
+    label: 'Sheep / Goat (Stray Livestock)',
     threatLevel: 'Low',
-    isSupported: false,
+    isSupportedWildlife: false,
+    guidance: 'Small livestock stray detected. Inspect boundary fence mesh to prevent cover-crop damage.'
   },
   horse: {
-    id: 'livestock-horse',
-    label: 'Horse (Farmed Animal)',
+    speciesId: 'livestock-horse',
+    label: 'Horse / Equine (Stray Animal)',
     threatLevel: 'Low',
-    isSupported: false,
+    isSupportedWildlife: false,
+    guidance: 'Equine stray near field path. Observe from safe distance.'
   },
   dog: {
-    id: 'canine-stray',
+    speciesId: 'canine-stray',
     label: 'Canine / Dog (Stray Animal)',
     threatLevel: 'Low',
-    isSupported: false,
+    isSupportedWildlife: false,
+    guidance: 'Stray canine detected near perimeter. Ensure livestock shelters are latched.'
   },
   cat: {
-    id: 'feline-stray',
+    speciesId: 'feline-stray',
     label: 'Feline / Cat',
     threatLevel: 'Low',
-    isSupported: false,
+    isSupportedWildlife: false,
+    guidance: 'Domestic or stray feline. Harmless to field crops.'
   },
   bird: {
-    id: 'avian',
+    speciesId: 'avian',
     label: 'Bird / Avian Pest',
     threatLevel: 'Low',
-    isSupported: false,
+    isSupportedWildlife: false,
+    guidance: 'Avian flock detected near crop canopy. Use visual bird-tape reflectors or ribbon lines.'
   },
+  person: {
+    speciesId: 'human',
+    label: 'Human / Farm Operator',
+    threatLevel: 'None',
+    isSupportedWildlife: false,
+    guidance: 'Authorized farm operator or pedestrian in detection zone.'
+  }
 };
 
-// Strict confidence threshold (0.50) to prevent false positive flickering
-const MIN_WILDLIFE_CONFIDENCE = 0.50;
+const MIN_DETECTION_CONFIDENCE = 0.40;
 
-// ── Wildlife Inference (COCO-SSD) ────────────────────────────────────────────
 /**
- * Run COCO-SSD object detection on an HTMLImageElement, HTMLVideoElement, or HTMLCanvasElement.
- * Returns an array of detections, each { speciesId, label, confidence, bbox, cocoClass }.
- * Returns empty array if nothing wildlife-relevant is detected above threshold.
+ * Execute real COCO-SSD object detection on an image, video, or canvas element.
+ * Returns raw model predictions and classified results.
  */
-export async function runWildlifeDetection(imageElement) {
+export async function runWildlifeDetection(imageSource) {
   const model = await loadCocoModel();
-  const predictions = await model.detect(imageElement);
+  const rawPredictions = await model.detect(imageSource);
 
-  const results = [];
+  const animalResults = [];
+  const otherResults = [];
 
-  for (const pred of predictions) {
+  for (const pred of rawPredictions) {
     const cls = pred.class.toLowerCase();
-    const rawScore = pred.score;
+    const score = pred.score;
 
-    if (!COCO_ANIMAL_SPECIES[cls]) continue; // Ignore non-animal objects (e.g. chairs, persons, cars)
+    if (score < MIN_DETECTION_CONFIDENCE) continue;
 
-    if (rawScore < MIN_WILDLIFE_CONFIDENCE) continue;
-
-    const animalMeta = COCO_ANIMAL_SPECIES[cls];
-
-    results.push({
-      speciesId: animalMeta.id,
-      label: animalMeta.label,
-      threatLevel: animalMeta.threatLevel,
-      isSupported: animalMeta.isSupported,
-      confidence: rawScore,
-      confidencePercent: `${(rawScore * 100).toFixed(1)}%`,
-      cocoClass: cls,
-      bbox: pred.bbox, // [x, y, width, height] in image pixels
-      isApproximate: false,
-    });
+    if (COCO_ANIMAL_CLASSES[cls]) {
+      const meta = COCO_ANIMAL_CLASSES[cls];
+      animalResults.push({
+        speciesId: meta.speciesId,
+        label: meta.label,
+        threatLevel: meta.threatLevel,
+        isSupportedWildlife: meta.isSupportedWildlife,
+        guidance: meta.guidance,
+        confidence: score,
+        confidencePercent: `${(score * 100).toFixed(1)}%`,
+        cocoClass: cls,
+        bbox: pred.bbox,
+        isAnimal: true
+      });
+    } else {
+      otherResults.push({
+        label: pred.class,
+        cocoClass: cls,
+        confidence: score,
+        confidencePercent: `${(score * 100).toFixed(1)}%`,
+        bbox: pred.bbox,
+        threatLevel: 'None',
+        isAnimal: false
+      });
+    }
   }
 
-  // Sort by confidence descending
-  results.sort((a, b) => b.confidence - a.confidence);
-  return results;
+  // Sort animals by highest confidence first
+  animalResults.sort((a, b) => b.confidence - a.confidence);
+  otherResults.sort((a, b) => b.confidence - a.confidence);
+
+  return {
+    animalDetections: animalResults,
+    otherDetections: otherResults,
+    allRawDetections: rawPredictions
+  };
 }
 
-// ── Crop Inference (MobileNet) ────────────────────────────────────────────────
 /**
- * Run MobileNet classification on an image.
- * Returns top predictions with honest disclosure about model limitations.
- *
- * IMPORTANT: MobileNet is trained on ImageNet, NOT plant diseases.
- * Results are indicative only. A custom PlantVillage model is needed for disease diagnosis.
+ * Execute real MobileNet classification on a crop leaf element
  */
-export async function runCropClassification(imageElement) {
+export async function runCropClassification(imageSource) {
   const model = await loadMobileNetModel();
-  const predictions = await model.classify(imageElement, 5);
+  const predictions = await model.classify(imageSource, 5);
 
-  // Determine overall confidence tier
-  const topPred = predictions[0];
-  const topConf = topPred?.probability ?? 0;
+  const top = predictions[0];
+  const topProb = top?.probability ?? 0;
 
-  if (topConf < 0.25) {
+  if (topProb < 0.22) {
     return {
       status: 'uncertain',
-      topLabel: topPred?.className || 'Unknown',
-      topConfidence: topConf,
+      topLabel: top?.className ? top.className.split(',')[0] : 'Unidentified',
+      topConfidence: topProb,
+      topConfidencePercent: `${(topProb * 100).toFixed(1)}%`,
       allPredictions: predictions,
-      message: 'Model confidence too low to determine plant condition. Please use a clear, well-lit leaf photo.',
-      disclaimer: 'MobileNet ImageNet model — not specialized for crop disease diagnosis.',
+      isPathologyModel: false,
+      message: 'Visual features too faint or low confidence to classify. Please provide a clear, well-lit close-up of the leaf surface.',
+      disclaimer: 'MobileNet v2 ImageNet vision model active. Not certified for microscopic plant pathology.'
     };
   }
 
-  if (topConf < 0.55) {
+  if (topProb < 0.50) {
     return {
       status: 'low_confidence',
-      topLabel: topPred?.className || 'Unknown',
-      topConfidence: topConf,
+      topLabel: top.className.split(',')[0],
+      topConfidence: topProb,
+      topConfidencePercent: `${(topProb * 100).toFixed(1)}%`,
       allPredictions: predictions,
-      message: `Low confidence result: "${topPred?.className}" (${(topConf * 100).toFixed(1)}%). Consider using a clearer, closer leaf photo.`,
-      disclaimer: 'MobileNet ImageNet model — not specialized for crop disease diagnosis. Results are indicative.',
+      isPathologyModel: false,
+      message: `Low confidence visual match: "${top.className.split(',')[0]}" (${(topProb * 100).toFixed(1)}%). Recommended: Capture leaf against a plain background under direct diffuse light.`,
+      disclaimer: 'MobileNet v2 ImageNet vision model active. For clinical crop disease diagnosis, custom PlantVillage weights are required.'
     };
   }
 
   return {
     status: 'detected',
-    topLabel: topPred?.className || 'Unknown',
-    topConfidence: topConf,
-    topConfidencePercent: `${(topConf * 100).toFixed(1)}%`,
+    topLabel: top.className.split(',')[0],
+    topConfidence: topProb,
+    topConfidencePercent: `${(topProb * 100).toFixed(1)}%`,
     allPredictions: predictions,
-    message: `Visual classification: "${topPred?.className}"`,
-    disclaimer: 'Note: MobileNet is trained on ImageNet general categories, not plant disease classification. For clinical crop disease diagnosis, a custom PlantVillage-trained model is required.',
+    isPathologyModel: false,
+    message: `Visual morphological classification: "${top.className.split(',')[0]}" (${(topProb * 100).toFixed(1)}%)`,
+    disclaimer: 'Notice: MobileNet v2 is an ImageNet visual classifier, not a clinical crop pathology diagnostic model. It identifies general visual categories. For verified foliar disease diagnosis, a PlantVillage-trained classifier is required.'
   };
 }
 
-// ── Canvas Bounding Box Renderer ─────────────────────────────────────────────
 /**
- * Draws detection bounding boxes and labels onto a canvas element.
- * @param {HTMLCanvasElement} canvas
- * @param {Array} detections — array from runWildlifeDetection()
- * @param {number} sourceWidth — source image/video natural width
- * @param {number} sourceHeight — source image/video natural height
+ * Draw bounding boxes and confidence badges onto an HTMLCanvasElement
  */
 export function drawBoundingBoxes(canvas, detections, sourceWidth, sourceHeight) {
   if (!canvas || !detections || detections.length === 0) return;
 
   const ctx = canvas.getContext('2d');
-  const scaleX = canvas.width / sourceWidth;
-  const scaleY = canvas.height / sourceHeight;
+  const scaleX = canvas.width / (sourceWidth || canvas.width);
+  const scaleY = canvas.height / (sourceHeight || canvas.height);
 
   for (const det of detections) {
     const [bx, by, bw, bh] = det.bbox;
@@ -289,33 +331,34 @@ export function drawBoundingBoxes(canvas, detections, sourceWidth, sourceHeight)
     const w = bw * scaleX;
     const h = bh * scaleY;
 
-    // Box color by threat approximation
-    const isHighThreat = det.speciesId === 'asian-elephant';
-    const boxColor = isHighThreat ? '#ef4444' : '#f59e0b';
+    const isHighThreat = det.threatLevel === 'High';
+    const isDomestic = det.threatLevel === 'None' || det.threatLevel === 'Low';
+    const boxColor = isHighThreat ? '#ef4444' : isDomestic ? '#3b82f6' : '#f59e0b';
 
-    // Draw box
+    // Box border with glow
     ctx.strokeStyle = boxColor;
     ctx.lineWidth = 2.5;
     ctx.shadowColor = boxColor;
-    ctx.shadowBlur = 6;
+    ctx.shadowBlur = 8;
     ctx.strokeRect(x, y, w, h);
     ctx.shadowBlur = 0;
 
-    // Label background
-    const labelText = `${det.label}: ${det.confidencePercent}`;
-    ctx.font = 'bold 13px -apple-system, sans-serif';
+    // Label tag above or inside box
+    const labelText = `${(det.label || det.cocoClass || 'Object').split('(')[0].trim()}: ${det.confidencePercent}`;
+    ctx.font = 'bold 12px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
     const textW = ctx.measureText(labelText).width;
-    ctx.fillStyle = isHighThreat ? 'rgba(239,68,68,0.88)' : 'rgba(245,158,11,0.88)';
-    ctx.fillRect(x, y > 20 ? y - 22 : y + 2, textW + 10, 20);
+    const badgeY = y > 24 ? y - 22 : y + 4;
 
-    // Label text
+    ctx.fillStyle = boxColor;
+    ctx.fillRect(x, badgeY, textW + 12, 20);
+
     ctx.fillStyle = '#ffffff';
-    ctx.fillText(labelText, x + 5, y > 20 ? y - 6 : y + 16);
+    ctx.fillText(labelText, x + 6, badgeY + 14);
   }
 }
 
 /**
- * Clears all drawings from a canvas.
+ * Clear all drawings from an HTMLCanvasElement
  */
 export function clearCanvas(canvas) {
   if (!canvas) return;

@@ -9,52 +9,6 @@ const STORAGE_KEYS = {
   NOTIFICATIONS: 'agrovision_notifications_v1'
 };
 
-// Initial realistic demonstration wildlife events (clearly labeled as Demonstration Data)
-const INITIAL_WILDLIFE_EVENTS = [
-  {
-    id: 'WLD-8041',
-    species: 'Wild Boar (Sus scrofa)',
-    speciesCommon: 'Wild Boar',
-    confidence: '94.2%',
-    timestamp: '2026-10-14 05:20:15',
-    source: 'Automated Camera (Night PIR)',
-    location: 'Sector 4B • South Border Trench',
-    status: 'Verified',
-    threatLevel: 'Medium',
-    isDemo: true,
-    thumbnail: 'https://images.pexels.com/photos/247399/pexels-photo-247399.jpeg?auto=compress&cs=tinysrgb&w=300',
-    notes: 'Foraging observed near cassava and groundnut boundary.'
-  },
-  {
-    id: 'WLD-8039',
-    species: 'Asian Elephant (Elephas maximus)',
-    speciesCommon: 'Asian Elephant',
-    confidence: '96.8%',
-    timestamp: '2026-10-13 22:45:00',
-    source: 'Live Camera Stream',
-    location: 'Sector 1A • Western Forest Perimeter',
-    status: 'Alert Dispatched',
-    threatLevel: 'High',
-    isDemo: true,
-    thumbnail: 'https://images.pexels.com/photos/66898/elephant-cub-tsavo-kenya-66898.jpeg?auto=compress&cs=tinysrgb&w=300',
-    notes: 'Solitary elephant detected traversing elephant corridor buffer.'
-  },
-  {
-    id: 'WLD-8035',
-    species: 'Spotted Deer (Axis axis)',
-    speciesCommon: 'Spotted Deer',
-    confidence: '91.5%',
-    timestamp: '2026-10-13 17:15:30',
-    source: 'Uploaded Image',
-    location: 'Sector 3C • East Canal Bank',
-    status: 'Resolved',
-    threatLevel: 'Low',
-    isDemo: true,
-    thumbnail: 'https://images.pexels.com/photos/1345190/pexels-photo-1345190.jpeg?auto=compress&cs=tinysrgb&w=300',
-    notes: 'Herd of 3 grazing on clover cover crop without crop harm.'
-  }
-];
-
 // Initial realistic demonstration crop health scans
 const INITIAL_CROP_SCANS = [
   {
@@ -66,7 +20,7 @@ const INITIAL_CROP_SCANS = [
     timestamp: '2026-10-14 08:30:10',
     isDemo: true,
     status: 'Action Recommended',
-    image: 'https://images.pexels.com/photos/1327838/pexels-photo-1327838.jpeg?auto=compress&cs=tinysrgb&w=600',
+    image: '/images/crop-early-blight.jpg',
     treatment: 'Apply neem seed kernel extract (5%) or copper oxychloride. Prune lower diseased foliage.'
   },
   {
@@ -78,7 +32,7 @@ const INITIAL_CROP_SCANS = [
     timestamp: '2026-10-13 14:10:45',
     isDemo: true,
     status: 'Healthy',
-    image: 'https://images.pexels.com/photos/247599/pexels-photo-247599.jpeg?auto=compress&cs=tinysrgb&w=600',
+    image: '/images/crop-healthy-paddy.jpg',
     treatment: 'Maintain current water depth (2-3cm) during panicle initiation.'
   },
   {
@@ -90,7 +44,7 @@ const INITIAL_CROP_SCANS = [
     timestamp: '2026-10-12 11:40:20',
     isDemo: true,
     status: 'Action Required',
-    image: 'https://images.pexels.com/photos/144248/potatoes-vegetables-erdfrucht-bio-144248.jpeg?auto=compress&cs=tinysrgb&w=600',
+    image: '/images/crop-late-blight.jpg',
     treatment: 'Ensure furrow drainage. Spray Mancozeb 75% WP under agronomist guidance.'
   }
 ];
@@ -117,17 +71,8 @@ const INITIAL_SETTINGS = {
   networkMode: 'online'
 };
 
-// Initial notifications
+// Initial system notifications (Only authentic system & telemetry alerts - zero fabricated animal detections)
 const INITIAL_NOTIFICATIONS = [
-  {
-    id: 'NOTIF-1',
-    type: 'wildlife',
-    title: 'Wildlife Detected: Wild Boar',
-    message: 'Motion detected at Sector 4B South Border. Gentle chime triggered.',
-    time: '25 mins ago',
-    severity: 'warning',
-    read: false
-  },
   {
     id: 'NOTIF-2',
     type: 'crop',
@@ -159,46 +104,46 @@ const INITIAL_NOTIFICATIONS = [
 
 /**
  * Wildlife History Storage
+ * Strictly returns genuine user detections.
+ * Purges legacy mock/demo entries (e.g. WLD-8041, WLD-8039, WLD-8035, fake 94.2% scores).
  */
 export function getWildlifeHistory() {
-  if (typeof window === 'undefined') return INITIAL_WILDLIFE_EVENTS;
+  if (typeof window === 'undefined') return [];
   const stored = localStorage.getItem(STORAGE_KEYS.WILDLIFE_HISTORY);
   if (!stored) {
-    localStorage.setItem(STORAGE_KEYS.WILDLIFE_HISTORY, JSON.stringify(INITIAL_WILDLIFE_EVENTS));
-    return INITIAL_WILDLIFE_EVENTS;
+    return [];
   }
-  // Map of old Unsplash URLs -> new reliable Pexels URLs
-  const THUMBNAIL_MIGRATION = {
-    'photo-1727701773949-69e701bdb680': 'https://images.pexels.com/photos/247399/pexels-photo-247399.jpeg?auto=compress&cs=tinysrgb&w=300',
-    'photo-1555685812-4b943f1cb0eb': 'https://images.pexels.com/photos/247399/pexels-photo-247399.jpeg?auto=compress&cs=tinysrgb&w=300',
-    'photo-1557050543-4d5f4e07ef46': 'https://images.pexels.com/photos/66898/elephant-cub-tsavo-kenya-66898.jpeg?auto=compress&cs=tinysrgb&w=300',
-    'photo-1484406566174-9da000fda645': 'https://images.pexels.com/photos/1345190/pexels-photo-1345190.jpeg?auto=compress&cs=tinysrgb&w=300',
-    'photo-1540573133985-87b6da6d54a9': 'https://images.pexels.com/photos/1123765/pexels-photo-1123765.jpeg?auto=compress&cs=tinysrgb&w=300',
-  };
+
   try {
     const parsed = JSON.parse(stored);
-    let updated = false;
-    const sanitized = parsed.map((item) => {
-      if (item.thumbnail) {
-        for (const [oldId, newUrl] of Object.entries(THUMBNAIL_MIGRATION)) {
-          if (item.thumbnail.includes(oldId)) {
-            updated = true;
-            return { ...item, thumbnail: newUrl };
-          }
-        }
-      }
-      return item;
+    if (!Array.isArray(parsed)) {
+      localStorage.setItem(STORAGE_KEYS.WILDLIFE_HISTORY, JSON.stringify([]));
+      return [];
+    }
+
+    // Purge outdated, fake, demo, or duplicate mock records
+    const legacyMockIds = new Set(['WLD-8041', 'WLD-8039', 'WLD-8035']);
+    const sanitized = parsed.filter((item) => {
+      if (!item || typeof item !== 'object') return false;
+      if (item.isDemo) return false;
+      if (legacyMockIds.has(item.id)) return false;
+      // Discard records with fake placeholder data
+      if (item.speciesCommon === 'Wild Boar' && item.confidence === '94.2%') return false;
+      return true;
     });
-    if (updated) {
+
+    if (sanitized.length !== parsed.length) {
       localStorage.setItem(STORAGE_KEYS.WILDLIFE_HISTORY, JSON.stringify(sanitized));
     }
     return sanitized;
   } catch (e) {
-    return INITIAL_WILDLIFE_EVENTS;
+    localStorage.setItem(STORAGE_KEYS.WILDLIFE_HISTORY, JSON.stringify([]));
+    return [];
   }
 }
 
 export function saveWildlifeEvent(event) {
+  if (!event) return getWildlifeHistory();
   const current = getWildlifeHistory();
   const updated = [event, ...current];
   localStorage.setItem(STORAGE_KEYS.WILDLIFE_HISTORY, JSON.stringify(updated));
@@ -213,7 +158,9 @@ export function deleteWildlifeEvent(id) {
 }
 
 export function clearWildlifeHistory() {
-  localStorage.setItem(STORAGE_KEYS.WILDLIFE_HISTORY, JSON.stringify([]));
+  if (typeof window !== 'undefined') {
+    localStorage.setItem(STORAGE_KEYS.WILDLIFE_HISTORY, JSON.stringify([]));
+  }
   return [];
 }
 

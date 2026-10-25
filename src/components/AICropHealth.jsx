@@ -12,34 +12,42 @@ import {
 export function AICropHealth({ onScanSaved }) {
   const presets = siteData.cropDiseaseDatabase;
 
-  const [selectedFile, setSelectedFile] = useState(null);
+  // Selected input image states
+  const [selectedFile, setSelectedFile] = useState(null); // File object or null
+  const [capturedDataUrl, setCapturedDataUrl] = useState(null); // dataUrl from camera or null
   const [previewUrl, setPreviewUrl] = useState(presets[0].sampleImage);
-  const [activePreset, setActivePreset] = useState(presets[0]);
+  const [activePreset, setActivePreset] = useState(presets[0]); // preset or null
+  const [inputMode, setInputMode] = useState('preset'); // 'preset' | 'upload' | 'camera'
+
+  // Analysis result states
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [analysisResult, setAnalysisResult] = useState(presets[0]);
+  const [analysisResult, setAnalysisResult] = useState(null); // null until analyzed or preset viewed
   const [errorMessage, setErrorMessage] = useState('');
   const [cameraError, setCameraError] = useState('');
-  const [isCameraActive, setIsCameraActive] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+
+  // Camera states
+  const [isCameraActive, setIsCameraActive] = useState(false);
   const [facingMode, setFacingMode] = useState('environment');
-  const [modelStatus, setModelStatus] = useState('idle'); // idle|loading|ready|error
-  const [liveCropResult, setLiveCropResult] = useState(null); // Real-time continuous prediction
+  const [modelStatus, setModelStatus] = useState('idle');
+  const [liveCropResult, setLiveCropResult] = useState(null);
 
   const fileInputRef = useRef(null);
   const streamRef = useRef(null);
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
+  const activeBlobUrlRef = useRef(null);
   const cropDetectionLoopRef = useRef(null);
 
-  // Preload MobileNet on mount
+  // Preload MobileNet model on mount
   useEffect(() => {
     const unsub = subscribeMobileNetStatus(setModelStatus);
     loadMobileNetModel().catch(() => {});
     return unsub;
   }, []);
 
-  // Stop camera stream & live loop on unmount
+  // Stop camera stream & live loop on unmount & revoke object URLs
   useEffect(() => {
     return () => {
       if (cropDetectionLoopRef.current) {
@@ -47,14 +55,17 @@ export function AICropHealth({ onScanSaved }) {
         cropDetectionLoopRef.current = null;
       }
       if (streamRef.current) {
-        streamRef.current.getTracks().forEach(t => t.stop());
+        streamRef.current.getTracks().forEach((t) => t.stop());
         streamRef.current = null;
       }
       if (videoRef.current) videoRef.current.srcObject = null;
+      if (activeBlobUrlRef.current) {
+        URL.revokeObjectURL(activeBlobUrlRef.current);
+      }
     };
   }, []);
 
-  // ── Live Crop Detection Loop ──────────────────────────────────────────────
+  // ── Live continuous inference loop for camera ─────────────────────────────
   const stopCropDetectionLoop = () => {
     if (cropDetectionLoopRef.current) {
       clearInterval(cropDetectionLoopRef.current);
@@ -79,21 +90,23 @@ export function AICropHealth({ onScanSaved }) {
       } catch (_) {
         // Frame dropped or model busy
       }
-    }, 800); // 800ms throttle for smooth continuous inference without freezing UI
+    }, 900); // 900ms throttle for smooth continuous inference without UI lag
   }, [modelStatus]);
 
-  // Restart live loop when model becomes ready while camera is active
   useEffect(() => {
     if (isCameraActive && modelStatus === 'ready' && !cropDetectionLoopRef.current) {
       startCropDetectionLoop();
     }
   }, [isCameraActive, modelStatus, startCropDetectionLoop]);
 
+  // ── Camera Controls ────────────────────────────────────────────────────────
   const startCamera = async (overrideFacing) => {
     setCameraError('');
     setErrorMessage('');
     setSavedSuccess(false);
-    const requestedFacing = overrideFacing || facingMode;
+
+    // Safeguard: handle React synthetic event object being passed as argument
+    const requestedFacing = typeof overrideFacing === 'string' ? overrideFacing : facingMode;
 
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       setCameraError(
@@ -102,10 +115,9 @@ export function AICropHealth({ onScanSaved }) {
       return;
     }
 
-    // Stop existing stream and loop before starting new one
     stopCropDetectionLoop();
     if (streamRef.current) {
-      streamRef.current.getTracks().forEach(t => t.stop());
+      streamRef.current.getTracks().forEach((t) => t.stop());
       streamRef.current = null;
     }
 
@@ -118,11 +130,13 @@ export function AICropHealth({ onScanSaved }) {
         });
       } catch (firstErr) {
         if (firstErr.name === 'NotAllowedError') throw firstErr;
+        // Fallback constraint
         stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
       }
 
       streamRef.current = stream;
       setIsCameraActive(true);
+      setInputMode('camera');
 
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
@@ -133,26 +147,18 @@ export function AICropHealth({ onScanSaved }) {
         }
       }
 
-      setTimeout(async () => {
-        if (videoRef.current && videoRef.current.srcObject !== stream) {
-          videoRef.current.srcObject = stream;
-          try { await videoRef.current.play(); } catch (_) {}
-        }
-      }, 50);
-
-      // Start continuous AI analysis if model is ready
       if (modelStatus === 'ready') {
         startCropDetectionLoop();
       }
     } catch (err) {
       console.warn('Crop camera access error:', err);
-      let msg = 'Camera permission denied or camera is in use.';
+      let msg = 'Camera permission denied or camera in use.';
       if (err.name === 'NotAllowedError') {
-        msg = 'Camera permission was denied. Please allow camera permissions in browser settings.';
+        msg = 'Camera permission was denied. Please allow camera permissions in your browser address bar.';
       } else if (err.name === 'NotFoundError') {
-        msg = 'No camera hardware found on this device.';
+        msg = 'No camera device detected on this system.';
       } else if (err.name === 'NotReadableError') {
-        msg = 'Camera is currently in use by another application.';
+        msg = 'Camera is currently in use by another application or operating system.';
       } else {
         msg = `Camera error: ${err.message || 'Check browser permissions'}`;
       }
@@ -180,36 +186,42 @@ export function AICropHealth({ onScanSaved }) {
   };
 
   const captureCropPhoto = () => {
-    if (!videoRef.current || !canvasRef.current) return;
     const video = videoRef.current;
     const canvas = canvasRef.current;
-    canvas.width = video.videoWidth || 640;
-    canvas.height = video.videoHeight || 480;
+    if (!video || !canvas || video.readyState < 2 || video.videoWidth === 0) {
+      setCameraError('Camera stream is not ready for frame capture. Please wait a second.');
+      return;
+    }
+
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
     const ctx = canvas.getContext('2d');
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
     const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
 
-    setPreviewUrl(dataUrl);
-    setSelectedFile(dataUrl);
-    setActivePreset({
-      id: 'crop-camera-capture',
-      crop: 'Field Foliage Scan',
-      disease: 'Camera Specimen Captured',
-      confidence: 'Ready for inference',
-      severity: 'Medium',
-      symptoms: 'Fresh foliar specimen captured from live camera feed.',
-      prevention: 'Inspect underside of leaves and keep moisture low.',
-      treatmentAdvice: 'Run AI Leaf Diagnosis to analyze specimen.',
-      sampleImage: dataUrl
-    });
-    setAnalysisResult(null);
     stopCamera();
+
+    // Revoke previous blob if any
+    if (activeBlobUrlRef.current) {
+      URL.revokeObjectURL(activeBlobUrlRef.current);
+      activeBlobUrlRef.current = null;
+    }
+
+    setSelectedFile(null);
+    setCapturedDataUrl(dataUrl);
+    setPreviewUrl(dataUrl);
+    setActivePreset(null);
+    setInputMode('camera');
+    setAnalysisResult(null); // Clear previous result so user sees fresh inference
+    setErrorMessage('');
+    setSavedSuccess(false);
   };
 
-  // Validate and set image
+  // ── File Upload Handling ──────────────────────────────────────────────────
   const handleFile = (file) => {
     setErrorMessage('');
     setSavedSuccess(false);
+    setCameraError('');
 
     if (!file) return;
 
@@ -220,37 +232,29 @@ export function AICropHealth({ onScanSaved }) {
     const hasValidExt = validExts.some((ext) => fileName.endsWith(ext));
 
     if (!validTypes.includes(file.type) && !hasValidExt) {
-      setErrorMessage(
-        'Invalid file format. Please upload a JPEG, PNG, or WebP leaf image.'
-      );
+      setErrorMessage('Invalid file format. Please upload a clear JPEG, PNG, or WebP leaf image.');
       return;
     }
 
-    // Size validation (< 10MB)
     if (file.size > 10 * 1024 * 1024) {
-      setErrorMessage(
-        'Image file size exceeds 10MB limit. Please upload a smaller photo.'
-      );
+      setErrorMessage('Image file size exceeds 10MB limit. Please upload a smaller photo.');
       return;
     }
+
+    // Revoke previous blob URL
+    if (activeBlobUrlRef.current) {
+      URL.revokeObjectURL(activeBlobUrlRef.current);
+    }
+
+    const objectUrl = URL.createObjectURL(file);
+    activeBlobUrlRef.current = objectUrl;
 
     setSelectedFile(file);
-    const objectUrl = URL.createObjectURL(file);
+    setCapturedDataUrl(null);
     setPreviewUrl(objectUrl);
-
-    // Default to an unknown/pending custom image state
-    setActivePreset({
-      id: 'custom-upload',
-      crop: 'Field Foliage Specimen',
-      disease: 'Awaiting AI Diagnostic Classification',
-      confidence: 'Pending',
-      severity: 'Pending',
-      symptoms: 'Foliar scan loaded. Click "Run AI Leaf Diagnosis" to classify symptoms.',
-      prevention: 'Maintain leaf hygiene and keep leaves well ventilated.',
-      treatmentAdvice: 'Execute neural classification below.',
-      sampleImage: objectUrl
-    });
-    setAnalysisResult(null);
+    setActivePreset(null);
+    setInputMode('upload');
+    setAnalysisResult(null); // Explicitly reset result on every new image!
   };
 
   const handleDragOver = (e) => {
@@ -272,70 +276,126 @@ export function AICropHealth({ onScanSaved }) {
   };
 
   const handleRemoveImage = () => {
+    if (activeBlobUrlRef.current) {
+      URL.revokeObjectURL(activeBlobUrlRef.current);
+      activeBlobUrlRef.current = null;
+    }
     setSelectedFile(null);
+    setCapturedDataUrl(null);
     setPreviewUrl(presets[0].sampleImage);
     setActivePreset(presets[0]);
-    setAnalysisResult(presets[0]);
+    setInputMode('preset');
+    setAnalysisResult(null);
     setErrorMessage('');
     setSavedSuccess(false);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const handleSelectPreset = (preset) => {
+    stopCamera();
+    if (activeBlobUrlRef.current) {
+      URL.revokeObjectURL(activeBlobUrlRef.current);
+      activeBlobUrlRef.current = null;
+    }
     setSelectedFile(null);
+    setCapturedDataUrl(null);
     setPreviewUrl(preset.sampleImage);
     setActivePreset(preset);
-    setAnalysisResult(preset);
+    setInputMode('preset');
+    setAnalysisResult({
+      id: `ref-${preset.id}`,
+      crop: preset.crop,
+      disease: preset.disease,
+      confidence: preset.confidence,
+      severity: preset.severity,
+      symptoms: preset.symptoms,
+      prevention: preset.prevention,
+      treatmentAdvice: preset.treatmentAdvice,
+      sampleImage: preset.sampleImage,
+      isPresetReference: true,
+      timestamp: new Date().toLocaleString()
+    });
     setErrorMessage('');
     setSavedSuccess(false);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  // Run model inference: FastAPI → MobileNet → preset fallback
+  // ── Inference Execution ───────────────────────────────────────────────────
   const handleRunAnalysis = async () => {
     setIsAnalyzing(true);
     setErrorMessage('');
     setSavedSuccess(false);
 
     try {
-      // ── 1. Try FastAPI backend (optional, port 8000) ──────────────────────
-      if (selectedFile) {
-        try {
-          const formData = new FormData();
-          if (typeof selectedFile === 'string' && selectedFile.startsWith('data:')) {
-            const parts = selectedFile.split(',');
-            const byteString = atob(parts[1]);
-            const mimeString = parts[0].split(':')[1].split(';')[0];
-            const ab = new ArrayBuffer(byteString.length);
-            const ia = new Uint8Array(ab);
-            for (let i = 0; i < byteString.length; i++) ia[i] = byteString.charCodeAt(i);
-            const blob = new Blob([ab], { type: mimeString });
-            formData.append('file', blob, 'leaf-camera-capture.jpg');
-          } else {
-            formData.append('file', selectedFile);
-          }
-
-          const response = await fetch('http://localhost:8000/api/predict-crop', {
-            method: 'POST',
-            body: formData,
-            signal: AbortSignal.timeout(1500)
-          });
-          if (response.ok) {
-            const data = await response.json();
-            setAnalysisResult({ ...data, sampleImage: previewUrl });
-            return; // backend success
-          }
-        } catch (_) { /* backend unavailable */ }
+      // 1. If user selected a preset knowledge base record, show the curated agronomy profile
+      if (inputMode === 'preset' && activePreset) {
+        setAnalysisResult({
+          id: `ref-${activePreset.id}-${Date.now()}`,
+          crop: activePreset.crop,
+          disease: activePreset.disease,
+          confidence: activePreset.confidence,
+          severity: activePreset.severity,
+          symptoms: activePreset.symptoms,
+          prevention: activePreset.prevention,
+          treatmentAdvice: activePreset.treatmentAdvice,
+          sampleImage: previewUrl,
+          isPresetReference: true,
+          timestamp: new Date().toLocaleString()
+        });
+        setIsAnalyzing(false);
+        return;
       }
 
-      // ── 2. Real MobileNet in-browser classification for both uploads and presets ──
+      // 2. Try optional FastAPI backend if running with verified weights
+      if (selectedFile || capturedDataUrl) {
+        try {
+          const healthRes = await fetch('http://localhost:8000/api/health', { signal: AbortSignal.timeout(1000) });
+          if (healthRes.ok) {
+            const health = await healthRes.json();
+            if (health.models?.crop_pathology_loaded) {
+              const formData = new FormData();
+              if (selectedFile) {
+                formData.append('file', selectedFile);
+              } else if (capturedDataUrl) {
+                const parts = capturedDataUrl.split(',');
+                const byteString = atob(parts[1]);
+                const mimeString = parts[0].split(':')[1].split(';')[0];
+                const ab = new ArrayBuffer(byteString.length);
+                const ia = new Uint8Array(ab);
+                for (let i = 0; i < byteString.length; i++) ia[i] = byteString.charCodeAt(i);
+                const blob = new Blob([ab], { type: mimeString });
+                formData.append('file', blob, 'camera-capture.jpg');
+              }
+
+              const backendRes = await fetch('http://localhost:8000/api/predict-crop', {
+                method: 'POST',
+                body: formData,
+                signal: AbortSignal.timeout(3000)
+              });
+              if (backendRes.ok) {
+                const data = await backendRes.json();
+                setAnalysisResult({
+                  ...data,
+                  sampleImage: previewUrl,
+                  isBackendModel: true,
+                  timestamp: new Date().toLocaleString()
+                });
+                setIsAnalyzing(false);
+                return;
+              }
+            }
+          }
+        } catch (_) {
+          // Backend offline or no custom weights — gracefully fall through to in-browser MobileNet
+        }
+      }
+
+      // 3. Real in-browser MobileNet v2 inference on current image
       if (modelStatus === 'ready') {
-        // Create an Image element from the preview URL
         const imgEl = new Image();
-        imgEl.crossOrigin = 'anonymous';
         await new Promise((resolve, reject) => {
           imgEl.onload = resolve;
-          imgEl.onerror = reject;
+          imgEl.onerror = () => reject(new Error('Cannot decode image file.'));
           imgEl.src = previewUrl;
         });
 
@@ -344,81 +404,64 @@ export function AICropHealth({ onScanSaved }) {
         if (classResult.status === 'uncertain') {
           setAnalysisResult({
             id: `diag-${Date.now()}`,
-            crop: 'Leaf / Plant Specimen',
-            disease: 'Uncertain — Low Model Confidence',
-            confidence: `${(classResult.topConfidence * 100).toFixed(1)}%`,
-            severity: 'Unknown',
+            crop: 'Plant Leaf Specimen',
+            disease: 'Unable to Identify Pathogen',
+            confidence: classResult.topConfidencePercent,
+            severity: 'Uncertain',
             symptoms: classResult.message,
-            prevention: 'Ensure the photo is well-lit, close-up, and shows only the leaf clearly against a plain background.',
-            treatmentAdvice: classResult.disclaimer,
+            prevention: 'Ensure the photo is taken in clear lighting, centered on the affected leaf area, with minimal background clutter.',
+            treatmentAdvice: 'MobileNet ImageNet model is active in-browser. It classifies visual categories rather than specialized microscopic foliar diseases. Consult an agricultural extension officer or plant pathology clinic.',
             sampleImage: previewUrl,
             isModelResult: true,
             isUncertain: true,
+            disclaimer: classResult.disclaimer,
             timestamp: new Date().toLocaleString()
           });
+          setIsAnalyzing(false);
           return;
         }
 
-        if (classResult.status === 'low_confidence') {
-          setAnalysisResult({
-            id: `diag-${Date.now()}`,
-            crop: 'Plant Specimen',
-            disease: `Low Confidence: ${classResult.topLabel.split(',')[0]}`,
-            confidence: `${(classResult.topConfidence * 100).toFixed(1)}%`,
-            severity: 'Uncertain',
-            symptoms: classResult.message,
-            prevention: 'Use a clearer, closer leaf photo for better results. Ensure good lighting and minimal background.',
-            treatmentAdvice: classResult.disclaimer,
-            sampleImage: previewUrl,
-            isModelResult: true,
-            isLowConfidence: true,
-            timestamp: new Date().toLocaleString()
-          });
-          return;
-        }
-
-        // Good confidence — show real MobileNet result
-        const topClasses = classResult.allPredictions
+        // Recognized category
+        const topClasses = (classResult.allPredictions || [])
           .slice(0, 3)
-          .map(p => `${p.className.split(',')[0]} (${(p.probability * 100).toFixed(1)}%)`);
+          .map((p) => `${p.className.split(',')[0]} (${(p.probability * 100).toFixed(1)}%)`)
+          .join('; ');
 
         setAnalysisResult({
           id: `diag-${Date.now()}`,
-          crop: 'Leaf / Plant Specimen',
-          disease: `Visual Classification: ${classResult.topLabel.split(',')[0]}`,
+          crop: 'Botanical Foliar Specimen',
+          disease: `Visual Classification: ${classResult.topLabel}`,
           confidence: classResult.topConfidencePercent,
-          severity: classResult.topConfidence > 0.75 ? 'Detectable' : 'Low',
-          symptoms: `Top visual classification: "${classResult.topLabel.split(',')[0]}" at ${classResult.topConfidencePercent} confidence. Top 3: ${topClasses.join('; ')}.`,
-          prevention: 'For clinical crop disease diagnosis, a custom PlantVillage-trained model is required. MobileNet identifies visual categories, not specific plant diseases.',
+          severity: classResult.topConfidence > 0.65 ? 'Moderate' : 'Low',
+          symptoms: `Primary visual trait: "${classResult.topLabel}" at ${classResult.topConfidencePercent} confidence. Top matches: ${topClasses}.`,
+          prevention: 'For certified crop pathology diagnosis, deploy custom PlantVillage weights. Clean field tools and maintain balanced root hydration.',
           treatmentAdvice: classResult.disclaimer,
           sampleImage: previewUrl,
           isModelResult: true,
+          disclaimer: classResult.disclaimer,
           allPredictions: classResult.allPredictions,
           timestamp: new Date().toLocaleString()
         });
+        setIsAnalyzing(false);
         return;
       }
 
-      // ── 3. Model loading / error states ─────────────────────────────────
       if (modelStatus === 'loading') {
-        setErrorMessage('AI model is still loading. Please wait a moment and try again.');
-        return;
-      }
-
-      if (modelStatus === 'error') {
-        setErrorMessage('MobileNet model failed to load. Check internet connection and reload.');
-        return;
+        setErrorMessage('TensorFlow.js MobileNet model is still loading into browser memory. Please wait a few seconds and retry.');
+      } else if (modelStatus === 'error') {
+        setErrorMessage('TensorFlow.js model failed to load. Check your internet connection and reload the page.');
+      } else {
+        setErrorMessage('AI inference engine is initializing. Please retry in a moment.');
       }
     } catch (err) {
-      setErrorMessage(
-        'Image analysis failed. Please try again with a clear, well-lit leaf photograph.'
-      );
+      console.warn('Crop analysis error:', err);
+      setErrorMessage(`Analysis could not complete: ${err.message || 'Please upload a clear leaf photograph.'}`);
     } finally {
       setIsAnalyzing(false);
     }
   };
 
-  // Save to history
+  // Save to history & generate notification
   const handleSaveToHistory = () => {
     if (!analysisResult) return;
 
@@ -427,20 +470,20 @@ export function AICropHealth({ onScanSaved }) {
       crop: analysisResult.crop,
       condition: analysisResult.disease,
       confidence: analysisResult.confidence,
-      severity: analysisResult.severity,
+      severity: analysisResult.severity || 'Moderate',
       timestamp: new Date().toLocaleString(),
-      isDemo: true,
+      isDemo: Boolean(analysisResult.isPresetReference),
       status: analysisResult.severity === 'None' ? 'Healthy' : 'Action Recommended',
       image: analysisResult.sampleImage,
-      treatment: analysisResult.treatmentAdvice
+      treatment: analysisResult.treatmentAdvice || analysisResult.prevention
     };
 
     saveCropScan(newScan);
     addNotification({
       id: `NOTIF-${Date.now()}`,
       type: 'crop',
-      title: `Crop Diagnostic Saved: ${analysisResult.crop}`,
-      message: `${analysisResult.disease} (Confidence ${analysisResult.confidence}). Action steps logged.`,
+      title: `Crop Diagnostic Logged: ${analysisResult.crop}`,
+      message: `${analysisResult.disease} (Confidence: ${analysisResult.confidence}). Action guidance recorded.`,
       time: 'Just now',
       severity: analysisResult.severity === 'High' ? 'danger' : 'info',
       read: false
@@ -448,11 +491,6 @@ export function AICropHealth({ onScanSaved }) {
 
     setSavedSuccess(true);
     if (onScanSaved) onScanSaved();
-  };
-
-  // Print single report
-  const handlePrintReport = () => {
-    window.print();
   };
 
   return (
@@ -468,30 +506,36 @@ export function AICropHealth({ onScanSaved }) {
             Foliar Computer Vision & Health Diagnosis
           </h2>
           <p className="section-subtitle">
-            Upload leaf photographs for instant pathogen classification, symptom verification, and cautious agricultural remedies.
+            Capture or upload leaf photographs for instant visual classification, symptom verification, and honest agricultural remedies.
           </p>
         </div>
 
         {/* Honest AI Model Connection Status Banner */}
         <div className="ai-status-banner">
           <div className="ai-status-left">
-            <span className={`status-indicator-dot ${
-              modelStatus === 'ready' ? 'online' :
-              modelStatus === 'loading' ? 'loading' :
-              modelStatus === 'error' ? 'error' : 'idle'
-            }`} />
+            <span
+              className={`status-indicator-dot ${
+                modelStatus === 'ready'
+                  ? 'online'
+                  : modelStatus === 'loading'
+                  ? 'loading'
+                  : modelStatus === 'error'
+                  ? 'error'
+                  : 'idle'
+              }`}
+            />
             <span>
               <strong>Crop AI Engine (MobileNet v2):</strong>&nbsp;
-              {modelStatus === 'idle' && 'Idle — model will load on first use'}
-              {modelStatus === 'loading' && 'Loading TensorFlow.js MobileNet v2 model…'}
-              {modelStatus === 'ready' && 'Model Ready — Real in-browser classification active'}
-              {modelStatus === 'error' && 'Model load failed — check internet and reload'}
+              {modelStatus === 'idle' && 'Initializing TensorFlow.js MobileNet v2…'}
+              {modelStatus === 'loading' && 'Loading TensorFlow.js MobileNet v2 model weights into browser…'}
+              {modelStatus === 'ready' && 'Model Ready — Real client-side MobileNet inference active'}
+              {modelStatus === 'error' && 'Model load failed — check network connectivity and reload'}
             </span>
           </div>
           <span className="disclaimer-chip">
             {modelStatus === 'loading' && <><Icon name="refresh" size={13} className="spin" /> Loading…</>}
-            {modelStatus === 'ready' && 'MobileNet TF.js • Live Inference'}
-            {(modelStatus === 'idle' || modelStatus === 'error') && 'Preset Knowledge Base Mode'}
+            {modelStatus === 'ready' && 'MobileNet TF.js • Live In-Browser'}
+            {modelStatus === 'error' && 'Model Offline'}
           </span>
         </div>
 
@@ -499,15 +543,16 @@ export function AICropHealth({ onScanSaved }) {
         <div className="sample-presets-bar">
           <span className="preset-label">
             <Icon name="leaf" size={16} />
-            Quick Test Leaf Specimens:
+            Reference Disease Knowledge Base:
           </span>
           <div className="preset-chips-scroll">
             {presets.map((preset) => (
               <button
                 key={preset.id}
                 type="button"
-                className={`preset-chip ${activePreset?.id === preset.id ? 'active' : ''}`}
+                className={`preset-chip ${activePreset?.id === preset.id && inputMode === 'preset' ? 'active' : ''}`}
                 onClick={() => handleSelectPreset(preset)}
+                title={`View ${preset.crop} - ${preset.disease} reference profile`}
               >
                 <span>{preset.crop}:</span>
                 <strong>{preset.disease}</strong>
@@ -516,9 +561,9 @@ export function AICropHealth({ onScanSaved }) {
           </div>
         </div>
 
-        {/* Main 2-Column Interface: Upload & Scanner Left, Diagnostics Right */}
+        {/* Main 2-Column Interface: Viewfinder Left, Diagnostics Right */}
         <div className="crop-scanner-grid">
-          {/* Left Column: Upload / Drag-and-Drop & Viewfinder */}
+          {/* Left Column: Upload / Viewfinder */}
           <div className="scanner-left-card">
             <div
               className={`dropzone-container ${isDragging ? 'dragging' : ''}`}
@@ -526,9 +571,9 @@ export function AICropHealth({ onScanSaved }) {
               onDragLeave={handleDragLeave}
               onDrop={handleDrop}
             >
-              {/* Image / Video Preview Area with Animated Reticle */}
+              {/* Image / Video Preview Area */}
               <div className="image-viewfinder-frame">
-                {/* Live Camera Video Feed (always in DOM, visible when camera active) */}
+                {/* Live Camera Video Feed */}
                 <video
                   ref={videoRef}
                   playsInline
@@ -539,7 +584,7 @@ export function AICropHealth({ onScanSaved }) {
                 />
                 <canvas ref={canvasRef} style={{ display: 'none' }} />
 
-                {/* Static Preview Image (visible when camera inactive) */}
+                {/* Static Preview Image */}
                 <img
                   src={previewUrl}
                   alt="Leaf Specimen"
@@ -548,7 +593,7 @@ export function AICropHealth({ onScanSaved }) {
                   onError={(e) => handleImageFallback(e, 'crop')}
                 />
 
-                {/* Animated HUD Laser Reticle */}
+                {/* HUD Laser Reticle */}
                 <div className={`viewfinder-reticle ${isAnalyzing || isCameraActive ? 'scanning' : ''}`}>
                   <div className="corner corner-tl" />
                   <div className="corner corner-tr" />
@@ -560,27 +605,26 @@ export function AICropHealth({ onScanSaved }) {
                 {isAnalyzing && (
                   <div className="analyzing-overlay-badge">
                     <Icon name="refresh" size={18} className="spin" />
-                    <span>Extracting Foliar Morphological Features...</span>
+                    <span>Processing Foliar Visual Features with MobileNet v2…</span>
                   </div>
                 )}
 
                 {isCameraActive && (
-                  <div className="analyzing-overlay-badge" style={{ background: 'rgba(22, 163, 74, 0.9)', maxWidth: '92%', whiteSpace: 'normal', textAlign: 'left', padding: '6px 12px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: liveCropResult ? '2px' : 0 }}>
+                  <div
+                    className="analyzing-overlay-badge"
+                    style={{ background: 'rgba(22, 163, 74, 0.9)', maxWidth: '92%', whiteSpace: 'normal', textAlign: 'left', padding: '6px 12px' }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <span className="live-pulse-dot camera-on" />
-                      <strong>REAL-TIME AI CROP SCANNER</strong>
+                      <strong>REAL-TIME CAMERA FEED ACTIVE</strong>
                     </div>
                     {liveCropResult ? (
                       <div style={{ fontSize: '0.82rem', marginTop: '3px', lineHeight: 1.3 }}>
-                        <span>Top Class: <strong>{liveCropResult.topLabel?.split(',')[0]}</strong></span>
-                        <span style={{ marginLeft: '8px', opacity: 0.9 }}>({(liveCropResult.topConfidence * 100).toFixed(1)}%)</span>
-                        <div style={{ fontSize: '0.75rem', opacity: 0.85, marginTop: '2px' }}>
-                          Status: {liveCropResult.status === 'detected' ? '✓ Characteristic Match' : '⚠ Searching / Low confidence'}
-                        </div>
+                        <span>Visual match: <strong>{liveCropResult.topLabel}</strong> ({liveCropResult.topConfidencePercent})</span>
                       </div>
                     ) : (
                       <div style={{ fontSize: '0.78rem', opacity: 0.85 }}>
-                        {modelStatus === 'ready' ? 'Analyzing live frames continuously...' : 'Loading AI model...'}
+                        Align leaf in frame and click "Capture Leaf Frame" to diagnose.
                       </div>
                     )}
                   </div>
@@ -592,19 +636,19 @@ export function AICropHealth({ onScanSaved }) {
                 <input
                   type="file"
                   ref={fileInputRef}
-                  onChange={(e) => handleFile(e.target.files[0])}
-                  accept="image/jpeg,image/png,image/webp"
+                  onChange={(e) => e.target.files && handleFile(e.target.files[0])}
+                  accept="image/jpeg,image/png,image/webp,image/jpg"
                   style={{ display: 'none' }}
                   id="crop-file-input"
                 />
 
                 <div className="file-btns-row">
-                  {/* Explicit Open Camera button for Crop Scanner */}
+                  {/* Camera Toggle Button */}
                   <button
                     type="button"
                     id="crop-open-camera-btn"
                     className={`btn ${isCameraActive ? 'btn-danger' : 'btn-outline'} btn-sm`}
-                    onClick={isCameraActive ? stopCamera : startCamera}
+                    onClick={() => (isCameraActive ? stopCamera() : startCamera())}
                     title={isCameraActive ? 'Close Camera Stream' : 'Open Camera for Real-Time Foliar Scan'}
                   >
                     <Icon name={isCameraActive ? 'square' : 'video'} size={16} />
@@ -617,7 +661,7 @@ export function AICropHealth({ onScanSaved }) {
                       id="crop-capture-btn"
                       className="btn btn-warning btn-sm"
                       onClick={captureCropPhoto}
-                      title="Snap photo from live feed and prepare for AI diagnosis"
+                      title="Snap photo from current camera feed for diagnosis"
                     >
                       <Icon name="camera" size={16} />
                       Capture Leaf Frame
@@ -648,27 +692,29 @@ export function AICropHealth({ onScanSaved }) {
                     </button>
                   )}
 
-                  <button
-                    type="button"
-                    id="crop-run-diagnosis-btn"
-                    className="btn btn-primary btn-sm"
-                    onClick={handleRunAnalysis}
-                    disabled={isAnalyzing}
-                  >
-                    <Icon name="scan" size={16} />
-                    {isAnalyzing
-                      ? 'Analyzing Image…'
-                      : modelStatus === 'loading'
-                      ? 'Model Loading…'
-                      : 'Run AI Leaf Diagnosis'}
-                  </button>
+                  {!isCameraActive && (
+                    <button
+                      type="button"
+                      id="crop-run-diagnosis-btn"
+                      className="btn btn-primary btn-sm"
+                      onClick={handleRunAnalysis}
+                      disabled={isAnalyzing}
+                    >
+                      <Icon name="scan" size={16} />
+                      {isAnalyzing
+                        ? 'Analyzing Image…'
+                        : inputMode === 'preset'
+                        ? 'View Reference Guide'
+                        : 'Run AI Leaf Diagnosis'}
+                    </button>
+                  )}
 
-                  {selectedFile && !isCameraActive && (
+                  {(selectedFile || capturedDataUrl) && !isCameraActive && (
                     <button
                       type="button"
                       className="btn btn-glass btn-sm"
                       onClick={handleRemoveImage}
-                      title="Remove Image"
+                      title="Clear uploaded image and restore reference presets"
                     >
                       <Icon name="x" size={16} />
                     </button>
@@ -677,8 +723,10 @@ export function AICropHealth({ onScanSaved }) {
 
                 <p className="drop-hint">
                   {isCameraActive
-                    ? 'Align leaf in the frame and click "Capture Leaf Frame" to diagnose.'
-                    : 'Use live camera or drag & drop a clear leaf photo here (JPEG, PNG, WebP up to 10MB)'}
+                    ? 'Center the leaf within the reticle and click "Capture Leaf Frame".'
+                    : inputMode === 'upload' || inputMode === 'camera'
+                    ? 'Image loaded. Click "Run AI Leaf Diagnosis" to process this specific photo.'
+                    : 'Select a reference specimen above, or use camera / upload to test your own leaf photograph.'}
                 </p>
 
                 {cameraError && (
@@ -689,7 +737,7 @@ export function AICropHealth({ onScanSaved }) {
                 )}
 
                 {errorMessage && (
-                  <div className="error-alert-box">
+                  <div className="error-alert-box" style={{ marginTop: '10px' }}>
                     <Icon name="alert-triangle" size={16} color="#ef4444" />
                     <span>{errorMessage}</span>
                   </div>
@@ -705,7 +753,7 @@ export function AICropHealth({ onScanSaved }) {
                 <div className="result-header-row">
                   <div>
                     <span className="result-kicker">
-                      Diagnosed Specimen
+                      {analysisResult.isPresetReference ? 'Knowledge Base Reference Specimen' : 'Diagnosed Specimen Result'}
                     </span>
                     <h3 className="result-disease-name">
                       {analysisResult.crop} – {analysisResult.disease}
@@ -724,63 +772,57 @@ export function AICropHealth({ onScanSaved }) {
                   </span>
                   <span className="timestamp-tag">
                     <Icon name="clock" size={14} />
-                    {analysisResult.timestamp || '2026-10-14 10:30'}
+                    {analysisResult.timestamp || new Date().toLocaleString()}
                   </span>
                 </div>
+
+                {/* Honest AI Model Disclosures */}
+                {analysisResult.isPresetReference && (
+                  <div className="demo-mode-notice" style={{ marginBottom: '14px', borderColor: '#16a34a' }}>
+                    <Icon name="leaf" size={16} color="#16a34a" />
+                    <span>
+                      <strong>AgroVision Reference Database:</strong> This is a curated knowledge base entry displaying characteristic foliar symptoms, biological prevention, and safe organic remedies for educational review.
+                    </span>
+                  </div>
+                )}
 
                 {analysisResult.isModelResult && (
                   <div className="demo-mode-notice" style={{ marginBottom: '14px', borderColor: '#0284c7' }}>
                     <Icon name="info" size={16} color="#0284c7" />
                     <span>
-                      <strong>Real AI Result (MobileNet v2):</strong> This is an actual TensorFlow.js model inference result, not a simulation.
-                      {analysisResult.isUncertain && ' Low confidence — image may not show a clear plant specimen.'}
-                      {analysisResult.isLowConfidence && ' Confidence is low — try a clearer, well-lit photo.'}
+                      <strong>TensorFlow.js MobileNet v2 Inference:</strong> {analysisResult.disclaimer}
                     </span>
                   </div>
                 )}
 
-                {analysisResult.isPresetResult && (
-                  <div className="demo-mode-notice" style={{ marginBottom: '14px' }}>
-                    <Icon name="leaf" size={16} color="#16a34a" />
-                    <span>
-                      <strong>Curated Knowledge Base Result:</strong> This result is from the AgroVision crop disease reference database, not a live model inference on your uploaded image.
-                    </span>
+                {/* Clinical Diagnostic Sections */}
+                <div className="diagnostic-details-stack">
+                  <div className="diag-section">
+                    <div className="diag-sec-title">
+                      <Icon name="alert-triangle" size={16} color="#d97706" />
+                      <span>Identified Symptoms & Visual Characteristics</span>
+                    </div>
+                    <p className="diag-sec-text">{analysisResult.symptoms}</p>
                   </div>
-                )}
 
-                <div className="diagnostic-block">
-                  <h4 className="diag-heading">
-                    <Icon name="eye" size={16} color="#16a34a" />
-                    Observed Symptoms
-                  </h4>
-                  <p className="diag-text">
-                    {analysisResult.symptoms}
-                  </p>
+                  <div className="diag-section">
+                    <div className="diag-sec-title">
+                      <Icon name="shield" size={16} color="#16a34a" />
+                      <span>Agronomic Prevention & Cultural Practices</span>
+                    </div>
+                    <p className="diag-sec-text">{analysisResult.prevention}</p>
+                  </div>
+
+                  <div className="diag-section">
+                    <div className="diag-sec-title">
+                      <Icon name="droplet" size={16} color="#0284c7" />
+                      <span>Recommended Organic & Cautious Remedies</span>
+                    </div>
+                    <p className="diag-sec-text">{analysisResult.treatmentAdvice}</p>
+                  </div>
                 </div>
 
-                <div className="diagnostic-block">
-                  <h4 className="diag-heading">
-                    <Icon name="shield" size={16} color="#0284c7" />
-                    Prevention & Crop Care Guidance
-                  </h4>
-                  <p className="diag-text">
-                    {analysisResult.prevention}
-                  </p>
-                </div>
-
-                <div className="diagnostic-block highlight-box">
-                  <h4 className="diag-heading">
-                    <Icon name="sprout" size={16} color="#16a34a" />
-                    Suggested Actionable Next Steps
-                  </h4>
-                  <p className="diag-text">{analysisResult.treatmentAdvice}</p>
-                  <p className="cautious-note">
-                    <Icon name="alert-triangle" size={14} color="#d97706" />
-                    Agronomic Disclaimer: Always consult a licensed local agricultural extension officer or Krishi Vigyan Kendra (KVK) expert before preparing chemical spray mixtures.
-                  </p>
-                </div>
-
-                {/* Save and Print Actions */}
+                {/* Action Buttons */}
                 <div className="result-actions-row">
                   <button
                     type="button"
@@ -788,27 +830,44 @@ export function AICropHealth({ onScanSaved }) {
                     onClick={handleSaveToHistory}
                     disabled={savedSuccess}
                   >
-                    <Icon name={savedSuccess ? 'check' : 'database'} size={16} />
-                    {savedSuccess ? 'Saved to History!' : 'Save to Detection History'}
+                    <Icon name={savedSuccess ? 'check' : 'bookmark'} size={15} />
+                    <span>{savedSuccess ? 'Scan Logged to History' : 'Save Diagnostic to History'}</span>
                   </button>
 
                   <button
                     type="button"
                     className="btn btn-outline btn-sm"
-                    onClick={handlePrintReport}
+                    onClick={() => window.print()}
                   >
-                    <Icon name="printer" size={16} />
-                    Print Diagnostic Report
+                    <Icon name="printer" size={15} />
+                    <span>Print Leaf Dossier</span>
                   </button>
                 </div>
+
+                {savedSuccess && (
+                  <div className="save-success-toast">
+                    <Icon name="check-circle" size={16} color="#16a34a" />
+                    <span>Scan recorded in Detection History and Farm Telemetry log.</span>
+                  </div>
+                )}
               </div>
             ) : (
-              <div className="scanner-empty-state">
-                <Icon name="scan" size={48} color="#4b7a4b" />
+              <div className="diagnostic-empty-state">
+                <div className="empty-icon-wrap">
+                  <Icon name="scan" size={36} color="#16a34a" />
+                </div>
                 <h3>Ready for Leaf Diagnosis</h3>
                 <p>
-                  Select a leaf specimen above or upload a fresh photograph to generate foliar diagnostic breakdown.
+                  Select a reference disease specimen from the quick switcher above, or upload a leaf photo / capture a live camera frame, then click <strong>"Run AI Leaf Diagnosis"</strong> to inspect.
                 </p>
+                <div className="empty-tips-box">
+                  <strong>Photo Guidelines for Optimal Analysis:</strong>
+                  <ul>
+                    <li>Hold leaf flat and fill at least 70% of the camera viewfinder</li>
+                    <li>Ensure even, diffused daytime lighting without heavy shadows</li>
+                    <li>Avoid blurry frames by holding device steady</li>
+                  </ul>
+                </div>
               </div>
             )}
           </div>

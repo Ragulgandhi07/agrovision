@@ -93,13 +93,14 @@ export const siteData = {
   ],
 
   // Wildlife Detection Species Database & Presets
+  // Wildlife Detection Species Database & Presets
   wildlifeDatabase: [
     {
       id: "wild-boar",
       commonName: "Wild Boar",
       scientificName: "Sus scrofa",
       threatLevel: "Medium",
-      defaultConfidence: "94.6%",
+      defaultConfidence: "Reference Profile",
       typicalHabit: "Nocturnal root-foraging; damages tuber crops, groundnuts, potatoes, and maize stalks.",
       safetyGuidance: "Keep a safe distance from the animal. Avoid approaching or cornering it. Use reflective flashers, auditory buzzers, or bio-fencing. Do not attempt direct contact.",
       recommendedActions: [
@@ -107,14 +108,14 @@ export const siteData = {
         "Activate mild non-lethal acoustic deterrent",
         "Record incident location for forest department boundary log"
       ],
-      sampleImage: "https://images.pexels.com/photos/247399/pexels-photo-247399.jpeg?auto=compress&cs=tinysrgb&w=800"
+      sampleImage: "/images/wild-boar.jpg"
     },
     {
       id: "asian-elephant",
       commonName: "Asian Elephant",
       scientificName: "Elephas maximus",
       threatLevel: "High",
-      defaultConfidence: "97.2%",
+      defaultConfidence: "Reference Profile",
       typicalHabit: "Corridor migration; attracted to sugarcane fields, banana plantations, and ripening paddy.",
       safetyGuidance: "CRITICAL SAFETY: Maintain an absolute safe perimeter (> 100 meters). Never direct high-beam torches into the animal's eyes. Alert neighboring farms and promptly inform the local Forest Department Rapid Response Team (RRT).",
       recommendedActions: [
@@ -122,14 +123,14 @@ export const siteData = {
         "Notify nearby village forest committee via AgroVision alert",
         "Follow local Forest Department safety protocols"
       ],
-      sampleImage: "https://images.pexels.com/photos/66898/elephant-cub-tsavo-kenya-66898.jpeg?auto=compress&cs=tinysrgb&w=800"
+      sampleImage: "/images/elephant.jpg"
     },
     {
       id: "spotted-deer",
       commonName: "Spotted Deer",
       scientificName: "Axis axis",
       threatLevel: "Low",
-      defaultConfidence: "92.4%",
+      defaultConfidence: "Reference Profile",
       typicalHabit: "Herbivore herd grazing; grazes on tender vegetable shoots, pulses, and grain seedlings.",
       safetyGuidance: "Spotted deer are docile and skittish. Use mild wind-chimes or solar-powered perimeter LED strobes to gently deter them without harm.",
       recommendedActions: [
@@ -137,14 +138,14 @@ export const siteData = {
         "Ensure field fencing is intact without sharp barbs",
         "Log grazing pattern for seasonal monitoring"
       ],
-      sampleImage: "https://images.pexels.com/photos/1345190/pexels-photo-1345190.jpeg?auto=compress&cs=tinysrgb&w=800"
+      sampleImage: "/images/deer.jpg"
     },
     {
       id: "bonnet-macaque",
       commonName: "Bonnet Macaque (Monkey)",
       scientificName: "Macaca radiata",
       threatLevel: "Medium",
-      defaultConfidence: "95.1%",
+      defaultConfidence: "Reference Profile",
       typicalHabit: "Diurnal troop foraging; damages fruit orchards, mangoes, tomatoes, and maize cobs.",
       safetyGuidance: "Avoid leaving open food waste or harvest bins. Install nylon canopy nets over fruit trees. Bio-acoustic distress chirps can deter troops safely.",
       recommendedActions: [
@@ -152,7 +153,7 @@ export const siteData = {
         "Harvest ripe fruit promptly to remove attraction",
         "Avoid leaving open water storage buckets"
       ],
-      sampleImage: "https://images.pexels.com/photos/1123765/pexels-photo-1123765.jpeg?auto=compress&cs=tinysrgb&w=800"
+      sampleImage: "/images/macaque.jpg"
     }
   ],
 
@@ -162,56 +163,56 @@ export const siteData = {
       id: "tomato-early-blight",
       crop: "Tomato",
       disease: "Early Blight (Alternaria solani)",
-      confidence: "94.8%",
+      confidence: "Reference Diagnostic",
       severity: "Moderate",
       symptoms: "Concentric dark brown rings ('target spots') on older leaves, surrounded by yellow chlorotic halos. Lower foliage turns brown, withers, and drops prematurely.",
       prevention: "Practice 3-year crop rotation with non-solanaceous crops. Stake plants for improved canopy airflow. Water at the base with drip lines to keep foliage dry.",
       treatmentAdvice: "Apply organic Trichoderma harzianum soil drench or 5% neem seed kernel extract. For severe fungal spread, consult local agricultural extension officer for Mancozeb 75 WP dosage guidelines.",
-      sampleImage: "https://upload.wikimedia.org/wikipedia/commons/thumb/0/04/Alternaria_solani_-_leaf_lesions.jpg/1280px-Alternaria_solani_-_leaf_lesions.jpg"
+      sampleImage: "/images/crop-early-blight.jpg"
     },
     {
       id: "potato-late-blight",
       crop: "Potato",
       disease: "Late Blight (Phytophthora infestans)",
-      confidence: "92.5%",
+      confidence: "Reference Diagnostic",
       severity: "High",
       symptoms: "Water-soaked, dark olive to black lesions on leaf tips and stems. White velvety fungal sporulation visible on the underside during humid mornings.",
       prevention: "Plant certified disease-free seed tubers. Space rows widely to accelerate foliage drying after morning dew. Destroy cull piles promptly.",
       treatmentAdvice: "Ensure immediate drainage of standing furrow water. Apply protective copper hydroxide or consult your regional KVK (Krishi Vigyan Kendra) agronomist.",
-      sampleImage: "https://upload.wikimedia.org/wikipedia/commons/thumb/1/14/Phytophthora_infestans_on_potato_leaf.jpg/1280px-Phytophthora_infestans_on_potato_leaf.jpg"
+      sampleImage: "/images/crop-late-blight.jpg"
     },
     {
       id: "rice-leaf-blast",
       crop: "Paddy / Rice",
       disease: "Rice Leaf Blast (Magnaporthe oryzae)",
-      confidence: "96.1%",
+      confidence: "Reference Diagnostic",
       severity: "High",
       symptoms: "Spindle-shaped or eye-shaped lesions with gray/whitish centers and dark reddish-brown margins on leaf blades. Lesions coalesce, burning the leaf canopy.",
       prevention: "Avoid excessive split applications of chemical nitrogen fertilizer. Treat seeds with Pseudomonas fluorescens (10g/kg seed) before nursery sowing.",
       treatmentAdvice: "Spray Pseudomonas fluorescens @ 2.5 kg/ha or consult the local agricultural officer for appropriate bio-formulation spray schedule.",
-      sampleImage: "https://upload.wikimedia.org/wikipedia/commons/a/ae/Rice_blast.jpg"
+      sampleImage: "/images/crop-rice-blast.jpg"
     },
     {
       id: "healthy-paddy",
       crop: "Paddy / Rice",
       disease: "Healthy Vigorous Canopy",
-      confidence: "98.7%",
+      confidence: "Reference Diagnostic",
       severity: "None",
       symptoms: "Uniform emerald-green canopy with erect leaves, zero necrotic lesions, and balanced chlorophyll index (SPAD 38-42).",
       prevention: "Maintain alternate wetting and drying (AWD) water management. Continue periodic field monitoring for stem borer or leaf folder eggs.",
       treatmentAdvice: "No chemical or bio-fungicide needed. Maintain current micronutrient and nitrogen balance.",
-      sampleImage: "https://upload.wikimedia.org/wikipedia/commons/0/04/Rice_leaf.jpg"
+      sampleImage: "/images/crop-healthy-paddy.jpg"
     },
     {
       id: "corn-common-rust",
       crop: "Maize / Corn",
       disease: "Common Rust (Puccinia sorghi)",
-      confidence: "93.2%",
+      confidence: "Reference Diagnostic",
       severity: "Moderate",
       symptoms: "Small, circular to elongate golden-brown to cinnamon-brown pustules scattered across both upper and lower leaf surfaces. Pustules rupture the epidermis.",
       prevention: "Select rust-resistant certified hybrid cultivars. Plant early in the season to evade peak airborne spore concentrations.",
       treatmentAdvice: "Maintain optimal potassium nutrition to bolster cell wall resistance. Consult agronomist for targeted bio-spray.",
-      sampleImage: "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b2/Puccinia_sorghi_Schwein._5465568.jpg/1280px-Puccinia_sorghi_Schwein._5465568.jpg"
+      sampleImage: "/images/crop-corn-rust.jpg"
     }
   ],
 

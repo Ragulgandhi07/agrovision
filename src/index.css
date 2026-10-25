@@ -719,7 +719,7 @@ button, input, textarea, select {
   bottom: 0;
   background-image: 
     linear-gradient(180deg, rgba(11, 36, 20, 0.82) 0%, rgba(16, 51, 29, 0.88) 60%, rgba(9, 35, 19, 0.98) 100%),
-    url("https://images.pexels.com/photos/2132227/pexels-photo-2132227.jpeg?auto=compress&cs=tinysrgb&w=2000");
+    url("/images/wildlife-placeholder.jpg");
   background-size: cover;
   background-position: center center;
   background-repeat: no-repeat;
@@ -1797,7 +1797,7 @@ button, input, textarea, select {
   position: relative;
   background-image: 
     linear-gradient(180deg, rgba(6, 30, 14, 0.4) 0%, rgba(6, 30, 14, 0.7) 100%),
-    url("https://images.pexels.com/photos/1084540/pexels-photo-1084540.jpeg?auto=compress&cs=tinysrgb&w=800");
+    url("/images/crop-corn-rust.jpg");
   background-size: cover;
   background-position: center;
   overflow: hidden;
@@ -3705,26 +3705,16 @@ textarea.form-control {
   object-fit: cover;
 }
 .ai-bounding-box {
-  position: absolute;
-  top: 20%;
-  left: 22%;
-  width: 55%;
-  height: 60%;
-  border: 2px solid #22c55e;
-  box-shadow: 0 0 12px rgba(34, 197, 94, 0.5);
-  pointer-events: none;
+  display: none !important;
 }
-.bbox-label {
+.static-image-bbox-canvas {
   position: absolute;
-  top: -24px;
-  left: -2px;
-  background: #22c55e;
-  color: #ffffff;
-  font-size: 0.68rem;
-  font-weight: 800;
-  padding: 2px 8px;
-  border-radius: 3px 3px 0 0;
-  letter-spacing: 0.04em;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  border-radius: 8px;
 }
 .analyzing-backdrop {
   position: absolute;

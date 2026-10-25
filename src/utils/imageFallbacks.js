@@ -1,19 +1,47 @@
 // Resilient image fallback utility for AgroVision
 // Ensures images always display reliably, even offline or if third-party CDNs fail
 
-export const DEFAULT_CROP_IMAGE =
-  'https://images.pexels.com/photos/1084540/pexels-photo-1084540.jpeg?auto=compress&cs=tinysrgb&w=600';
+export const DEFAULT_CROP_IMAGE = '/images/crop-early-blight.jpg';
+export const DEFAULT_WILDLIFE_IMAGE = '/images/wildlife-placeholder.jpg';
 
-export const DEFAULT_WILDLIFE_IMAGE =
-  'https://images.pexels.com/photos/247399/pexels-photo-247399.jpeg?auto=compress&cs=tinysrgb&w=600';
-
-// Per-species Pexels image map for targeted fallbacks
+// Per-species verified local images (Zero external CDN dependency)
 export const WILDLIFE_SPECIES_IMAGES = {
-  'wild-boar':       'https://images.pexels.com/photos/247399/pexels-photo-247399.jpeg?auto=compress&cs=tinysrgb&w=600',
-  'asian-elephant':  'https://images.pexels.com/photos/66898/elephant-cub-tsavo-kenya-66898.jpeg?auto=compress&cs=tinysrgb&w=600',
-  'spotted-deer':    'https://images.pexels.com/photos/1345190/pexels-photo-1345190.jpeg?auto=compress&cs=tinysrgb&w=600',
-  'bonnet-macaque':  'https://images.pexels.com/photos/1123765/pexels-photo-1123765.jpeg?auto=compress&cs=tinysrgb&w=600',
+  'wild-boar':       '/images/wild-boar.jpg',
+  'boar':            '/images/wild-boar.jpg',
+  'asian-elephant':  '/images/elephant.jpg',
+  'elephant':        '/images/elephant.jpg',
+  'spotted-deer':    '/images/deer.jpg',
+  'deer':            '/images/deer.jpg',
+  'bonnet-macaque':  '/images/macaque.jpg',
+  'macaque':         '/images/macaque.jpg',
+  'monkey':          '/images/macaque.jpg'
 };
+
+/**
+ * Returns the exact verified image corresponding to a wildlife species name.
+ * Never displays a misleading animal image (e.g. never shows a wild boar for an elephant).
+ */
+export function getWildlifeSpeciesImage(speciesName) {
+  if (!speciesName || typeof speciesName !== 'string') {
+    return DEFAULT_WILDLIFE_IMAGE;
+  }
+  const s = speciesName.toLowerCase();
+
+  if (s.includes('elephant')) {
+    return WILDLIFE_SPECIES_IMAGES['asian-elephant'];
+  }
+  if (s.includes('deer') || s.includes('axis')) {
+    return WILDLIFE_SPECIES_IMAGES['spotted-deer'];
+  }
+  if (s.includes('boar') || s.includes('scrofa') || s.includes('pig')) {
+    return WILDLIFE_SPECIES_IMAGES['wild-boar'];
+  }
+  if (s.includes('macaque') || s.includes('monkey') || s.includes('macaca')) {
+    return WILDLIFE_SPECIES_IMAGES['bonnet-macaque'];
+  }
+
+  return DEFAULT_WILDLIFE_IMAGE;
+}
 
 // Offline-safe SVG placeholders (Zero network dependency)
 export const FALLBACK_CROP_SVG =
@@ -70,12 +98,21 @@ export const FALLBACK_WILDLIFE_SVG =
 
 /**
  * Global onError handler for <img> tags
- * Immediately falls back to the guaranteed offline SVG data URI
+ * Immediately falls back gracefully without ever showing an incorrect animal
  */
-export function handleImageFallback(event, type = 'crop') {
+export function handleImageFallback(event, type = 'crop', speciesContext = null) {
   const target = event.currentTarget || event.target;
   if (!target) return;
-  // Prevent infinite loop
-  target.onerror = null;
+  target.onerror = null; // Prevent loop
+
+  if (type === 'wildlife' && speciesContext) {
+    const specificImage = getWildlifeSpeciesImage(speciesContext);
+    if (specificImage && target.src !== specificImage) {
+      target.src = specificImage;
+      return;
+    }
+  }
+
   target.src = type === 'wildlife' ? FALLBACK_WILDLIFE_SVG : FALLBACK_CROP_SVG;
 }
+
