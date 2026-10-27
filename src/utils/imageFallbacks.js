@@ -1,20 +1,36 @@
 // Resilient image fallback utility for AgroVision
-// Ensures images always display reliably, even offline or if third-party CDNs fail
+// Ensures images always display reliably across root domain, subpaths (GitHub Pages), and offline
 
-export const DEFAULT_CROP_IMAGE = '/images/crop-early-blight.jpg';
-export const DEFAULT_WILDLIFE_IMAGE = '/images/wildlife-placeholder.jpg';
+const BASE = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.BASE_URL) || './';
+
+/**
+ * Resolves local public assets properly according to the Vite base path (e.g. ./ or /agrovision/)
+ */
+export function getAssetUrl(path) {
+  if (!path) return '';
+  if (path.startsWith('http://') || path.startsWith('https://') || path.startsWith('data:') || path.startsWith('blob:')) {
+    return path;
+  }
+  const clean = path.replace(/^\.?\//, '');
+  const prefix = BASE.endsWith('/') ? BASE : `${BASE}/`;
+  return `${prefix}${clean}`;
+}
+
+export const DEFAULT_CROP_IMAGE = getAssetUrl('images/crop-early-blight.jpg');
+export const DEFAULT_WILDLIFE_IMAGE = getAssetUrl('images/wildlife-placeholder.jpg');
 
 // Per-species verified local images (Zero external CDN dependency)
 export const WILDLIFE_SPECIES_IMAGES = {
-  'wild-boar':       '/images/wild-boar.jpg',
-  'boar':            '/images/wild-boar.jpg',
-  'asian-elephant':  '/images/elephant.jpg',
-  'elephant':        '/images/elephant.jpg',
-  'spotted-deer':    '/images/deer.jpg',
-  'deer':            '/images/deer.jpg',
-  'bonnet-macaque':  '/images/macaque.jpg',
-  'macaque':         '/images/macaque.jpg',
-  'monkey':          '/images/macaque.jpg'
+  'wild-boar':       getAssetUrl('images/wild-boar.jpg'),
+  'boar':            getAssetUrl('images/wild-boar.jpg'),
+  'asian-elephant':  getAssetUrl('images/elephant.jpg'),
+  'elephant':        getAssetUrl('images/elephant.jpg'),
+  'spotted-deer':    getAssetUrl('images/deer.jpg'),
+  'deer':            getAssetUrl('images/deer.jpg'),
+  'bonnet-macaque':  getAssetUrl('images/macaque.jpg'),
+  'macaque':         getAssetUrl('images/macaque.jpg'),
+  'monkey':          getAssetUrl('images/macaque.jpg'),
+  'tiger':           getAssetUrl('images/tiger.jpg')
 };
 
 /**
@@ -38,6 +54,9 @@ export function getWildlifeSpeciesImage(speciesName) {
   }
   if (s.includes('macaque') || s.includes('monkey') || s.includes('macaca')) {
     return WILDLIFE_SPECIES_IMAGES['bonnet-macaque'];
+  }
+  if (s.includes('tiger')) {
+    return WILDLIFE_SPECIES_IMAGES.tiger;
   }
 
   return DEFAULT_WILDLIFE_IMAGE;

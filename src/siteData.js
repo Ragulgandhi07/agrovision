@@ -1,13 +1,15 @@
+import { getAssetUrl } from './utils/imageFallbacks';
+
 // AgroVision - Master Site Data
 // Professional English Only
 
 export const siteData = {
   brand: {
     name: "AgroVision",
-    fullName: "AgroVision – Smart Farming and AI-Based Detection System",
-    tagline: "Smart Farming, Safer Crops",
-    subheading: "Empowering farmers with AI-assisted crop health monitoring, wildlife threat identification, and intelligent farming insights.",
-    description: "Next-generation precision agriculture platform. Integrating edge AI foliage diagnostics, non-invasive wildlife detection alerts, IoT soil telemetry, and hyper-local agronomy to secure farm yields and livelihoods."
+    fullName: "AgroVision – Real-Time Farm Monitoring & Smart Alert System",
+    tagline: "Real-Time Farm Monitoring & Smart Alerts",
+    subheading: "Continuous farm condition monitoring with live weather, GPS telemetry, soil moisture tracking, and smart alerts.",
+    description: "Next-generation farm monitoring platform. Continuous telemetry tracking field microclimates, soil moisture gradients, smart alert notifications, and perimeter diagnostics to safeguard farm yields and livelihoods."
   },
 
   // Navigation Items required by specification
@@ -27,9 +29,9 @@ export const siteData = {
   // Hero Section
   hero: {
     badge: "Smart India Hackathon • Agricultural Innovation",
-    headline: "AgroVision – Smart Farming, Safer Crops",
-    subheadline: "Empowering farmers with AI-assisted crop health monitoring, wildlife threat identification, and intelligent farming insights.",
-    ctaDashboard: "Explore Dashboard",
+    headline: "AgroVision – Real-Time Farm Monitoring App",
+    subheadline: "Continuous farm condition monitoring — live weather & GPS telemetry, soil moisture & temperature monitoring, and smart farm alerts.",
+    ctaDashboard: "Farm Monitoring Dashboard",
     ctaCrop: "Crop Disease Detection",
     ctaWildlife: "Wildlife Detection",
     stats: [
@@ -108,7 +110,7 @@ export const siteData = {
         "Activate mild non-lethal acoustic deterrent",
         "Record incident location for forest department boundary log"
       ],
-      sampleImage: "/images/wild-boar.jpg"
+      sampleImage: getAssetUrl("images/wild-boar.jpg")
     },
     {
       id: "asian-elephant",
@@ -123,7 +125,7 @@ export const siteData = {
         "Notify nearby village forest committee via AgroVision alert",
         "Follow local Forest Department safety protocols"
       ],
-      sampleImage: "/images/elephant.jpg"
+      sampleImage: getAssetUrl("images/elephant.jpg")
     },
     {
       id: "spotted-deer",
@@ -138,7 +140,7 @@ export const siteData = {
         "Ensure field fencing is intact without sharp barbs",
         "Log grazing pattern for seasonal monitoring"
       ],
-      sampleImage: "/images/deer.jpg"
+      sampleImage: getAssetUrl("images/deer.jpg")
     },
     {
       id: "bonnet-macaque",
@@ -153,7 +155,7 @@ export const siteData = {
         "Harvest ripe fruit promptly to remove attraction",
         "Avoid leaving open water storage buckets"
       ],
-      sampleImage: "/images/macaque.jpg"
+      sampleImage: getAssetUrl("images/macaque.jpg")
     }
   ],
 
@@ -168,7 +170,7 @@ export const siteData = {
       symptoms: "Concentric dark brown rings ('target spots') on older leaves, surrounded by yellow chlorotic halos. Lower foliage turns brown, withers, and drops prematurely.",
       prevention: "Practice 3-year crop rotation with non-solanaceous crops. Stake plants for improved canopy airflow. Water at the base with drip lines to keep foliage dry.",
       treatmentAdvice: "Apply organic Trichoderma harzianum soil drench or 5% neem seed kernel extract. For severe fungal spread, consult local agricultural extension officer for Mancozeb 75 WP dosage guidelines.",
-      sampleImage: "/images/crop-early-blight.jpg"
+      sampleImage: getAssetUrl("images/crop-early-blight.jpg")
     },
     {
       id: "potato-late-blight",
@@ -179,7 +181,7 @@ export const siteData = {
       symptoms: "Water-soaked, dark olive to black lesions on leaf tips and stems. White velvety fungal sporulation visible on the underside during humid mornings.",
       prevention: "Plant certified disease-free seed tubers. Space rows widely to accelerate foliage drying after morning dew. Destroy cull piles promptly.",
       treatmentAdvice: "Ensure immediate drainage of standing furrow water. Apply protective copper hydroxide or consult your regional KVK (Krishi Vigyan Kendra) agronomist.",
-      sampleImage: "/images/crop-late-blight.jpg"
+      sampleImage: getAssetUrl("images/crop-late-blight.jpg")
     },
     {
       id: "rice-leaf-blast",
@@ -190,7 +192,7 @@ export const siteData = {
       symptoms: "Spindle-shaped or eye-shaped lesions with gray/whitish centers and dark reddish-brown margins on leaf blades. Lesions coalesce, burning the leaf canopy.",
       prevention: "Avoid excessive split applications of chemical nitrogen fertilizer. Treat seeds with Pseudomonas fluorescens (10g/kg seed) before nursery sowing.",
       treatmentAdvice: "Spray Pseudomonas fluorescens @ 2.5 kg/ha or consult the local agricultural officer for appropriate bio-formulation spray schedule.",
-      sampleImage: "/images/crop-rice-blast.jpg"
+      sampleImage: getAssetUrl("images/crop-rice-blast.jpg")
     },
     {
       id: "healthy-paddy",
@@ -201,7 +203,7 @@ export const siteData = {
       symptoms: "Uniform emerald-green canopy with erect leaves, zero necrotic lesions, and balanced chlorophyll index (SPAD 38-42).",
       prevention: "Maintain alternate wetting and drying (AWD) water management. Continue periodic field monitoring for stem borer or leaf folder eggs.",
       treatmentAdvice: "No chemical or bio-fungicide needed. Maintain current micronutrient and nitrogen balance.",
-      sampleImage: "/images/crop-healthy-paddy.jpg"
+      sampleImage: getAssetUrl("images/crop-healthy-paddy.jpg")
     },
     {
       id: "corn-common-rust",
@@ -212,7 +214,7 @@ export const siteData = {
       symptoms: "Small, circular to elongate golden-brown to cinnamon-brown pustules scattered across both upper and lower leaf surfaces. Pustules rupture the epidermis.",
       prevention: "Select rust-resistant certified hybrid cultivars. Plant early in the season to evade peak airborne spore concentrations.",
       treatmentAdvice: "Maintain optimal potassium nutrition to bolster cell wall resistance. Consult agronomist for targeted bio-spray.",
-      sampleImage: "/images/crop-corn-rust.jpg"
+      sampleImage: getAssetUrl("images/crop-corn-rust.jpg")
     }
   ],
 

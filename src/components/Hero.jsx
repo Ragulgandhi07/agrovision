@@ -79,42 +79,42 @@ export function Hero() {
           </div>
 
           <h1 className="hero-title">
-            AgroVision – <span>Smart Farming, Safer Crops</span>
+            AgroVision – <span>Real-Time Farm Monitoring App</span>
           </h1>
 
           <p className="hero-subtitle">
             {hero.subheadline}
           </p>
 
-          {/* 3 Call-To-Action Buttons required by prompt */}
+          {/* 3 Call-To-Action Buttons */}
           <div className="hero-ctas-triple">
             <a href="#dashboard" className="btn btn-primary">
               <Icon name="gauge" size={18} color="#ffffff" />
               {hero.ctaDashboard}
             </a>
+            <a href="#weather" className="btn btn-glass">
+              <Icon name="cloud-sun" size={18} color="#86efac" />
+              Live Weather & GPS
+            </a>
             <a href="#crop-disease" className="btn btn-glass">
               <Icon name="leaf" size={18} color="#86efac" />
               {hero.ctaCrop}
-            </a>
-            <a href="#wildlife" className="btn btn-warning-glass">
-              <Icon name="shield-alert" size={18} color="#fde047" />
-              {hero.ctaWildlife}
             </a>
           </div>
 
           {/* Quick Platform Pillars */}
           <div className="hero-trust-badges">
             <span className="trust-pill">
-              <Icon name="cpu" size={14} color="#86efac" /> AI Edge Detection
+              <Icon name="crosshair" size={14} color="#86efac" /> Live Weather & GPS
             </span>
             <span className="trust-pill">
-              <Icon name="volume-2" size={14} color="#86efac" /> Mild Audio Alerts
+              <Icon name="droplets" size={14} color="#86efac" /> Soil & Field Telemetry
             </span>
             <span className="trust-pill">
-              <Icon name="droplets" size={14} color="#86efac" /> LoRaWAN Irrigation
+              <Icon name="bell" size={14} color="#86efac" /> Smart Condition Alerts
             </span>
             <span className="trust-pill">
-              <Icon name="file-text" size={14} color="#86efac" /> Audit-Ready Reports
+              <Icon name="cpu" size={14} color="#86efac" /> AI Edge Diagnostics
             </span>
           </div>
         </div>

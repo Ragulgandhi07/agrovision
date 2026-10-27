@@ -36,9 +36,9 @@ export function SmartIrrigation() {
 
       setValveToggling(false);
       setActionNotice(
-        'Solenoid actuator signal dispatched to ESP32 relay controller.'
+        `Simulated actuator state switched to ${nextStatus === 'Active' ? 'OPEN' : 'CLOSED'} (Demo Simulation — Physical ESP32 relay not connected).`
       );
-    }, 500);
+    }, 450);
   };
 
   return (
@@ -61,14 +61,14 @@ export function SmartIrrigation() {
         {/* Telemetry Hardware Mode Notice */}
         <div className="telemetry-banner-notice">
           <div className="telemetry-badge-pulse">
-            <span className="live-dot" />
+            <span className="live-dot demo" />
             <span>
-              <strong>Hardware Telemetry Status:</strong>{' '}
-              Sensor Telemetry Ready (Simulation Mode • ESP32 LoRaWAN Gateway Compatible)
+              <strong>Hardware Status:</strong>{' '}
+              Simulated Demo Data — Sensors Not Connected (Code structure ready for ESP32 & LoRaWAN integration)
             </span>
           </div>
           <span className="last-sync-time">
-            Sub-inch telemetry synced every 60s
+            Simulated Demo Feed
           </span>
         </div>
 
@@ -181,11 +181,11 @@ export function SmartIrrigation() {
                   <Icon name="valve" size={24} color={activeSector.valveStatus === 'Active' ? '#16a34a' : '#64748b'} />
                 </div>
                 <div>
-                  <h4>Solenoid Actuator State:</h4>
+                  <h4>Solenoid Actuator (Simulation):</h4>
                   <span className="valve-current">
                     {activeSector.valveStatus === 'Active'
-                      ? `OPEN • Flowing at ${activeSector.flowRate}`
-                      : 'CLOSED • Standby'}
+                      ? `OPEN • Simulated Flow ${activeSector.flowRate}`
+                      : 'CLOSED • Standby (Sensors Not Connected)'}
                   </span>
                 </div>
               </div>
@@ -199,10 +199,10 @@ export function SmartIrrigation() {
                 <Icon name={activeSector.valveStatus === 'Active' ? 'square' : 'play'} size={16} />
                 <span>
                   {valveToggling
-                    ? 'Dispatching Signal...'
+                    ? 'Updating Simulation...'
                     : activeSector.valveStatus === 'Active'
-                    ? 'Close Solenoid Valve'
-                    : 'Open Solenoid Valve'}
+                    ? 'Close Simulated Valve'
+                    : 'Open Simulated Valve'}
                 </span>
               </button>
             </div>

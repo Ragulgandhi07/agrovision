@@ -16,11 +16,16 @@ import {
   getWildlifeSpeciesImage
 } from '../utils/imageFallbacks';
 import {
-  loadCocoModel,
+  loadWildlifeModels,
+  retryLoadCocoModel,
+  retryLoadMobileNetModel,
   subscribeCocoStatus,
+  subscribeMobileNetStatus,
   runWildlifeDetection,
   drawBoundingBoxes,
   clearCanvas,
+  WILDLIFE_UNCERTAIN_MESSAGE,
+  WILDLIFE_MODEL_COVERAGE,
 } from '../utils/tfModels';
 import { getCurrentGPSLocation } from '../utils/geoWeather';
 
@@ -35,7 +40,7 @@ export function WildlifeDetection({
 
   // Active analysis states
   const [activePreset, setActivePreset] = useState(null);
-  const [previewImage, setPreviewImage] = useState('/images/wildlife-placeholder.jpg');
+  const [previewImage, setPreviewImage] = useState(DEFAULT_WILDLIFE_IMAGE);
   const [selectedFile, setSelectedFile] = useState(null);
   const [capturedDataUrl, setCapturedDataUrl] = useState(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -61,8 +66,16 @@ export function WildlifeDetection({
   const activeBlobUrlRef = useRef(null);
 
   // AI Model state
-  const [modelStatus, setModelStatus] = useState('idle'); // idle|loading|ready|error
+  const [detectorStatus, setDetectorStatus] = useState('idle'); // coco-ssd
+  const [classifierStatus, setClassifierStatus] = useState('idle'); // mobilenet
+  const [modelErrorDetail, setModelErrorDetail] = useState('');
   const [liveDetections, setLiveDetections] = useState([]); // detections on current video frame
+
+  const modelStatus = (() => {
+    if (classifierStatus === 'ready' || detectorStatus === 'ready') return 'ready';
+    if (classifierStatus === 'error' && detectorStatus === 'error') return 'error';
+    return 'loading';
+  })();
 
   // Incident location states
   const [incidentLocation, setIncidentLocation] = useState('Sector 4B • South Border Trench');
@@ -79,11 +92,19 @@ export function WildlifeDetection({
     setHistoryRecords(getWildlifeHistory());
   }, []);
 
-  // Preload COCO-SSD model on mount and subscribe to status
+  // Preload MobileNet classifier + COCO-SSD detector on mount
   useEffect(() => {
-    const unsub = subscribeCocoStatus(setModelStatus);
-    loadCocoModel().catch(() => {});
-    return unsub;
+    const unsubCoco = subscribeCocoStatus(setDetectorStatus);
+    const unsubMn = subscribeMobileNetStatus(setClassifierStatus);
+    loadWildlifeModels()
+      .then(() => setModelErrorDetail(''))
+      .catch((err) => {
+        setModelErrorDetail(err.message || 'Wildlife models failed to load. Check the network and retry.');
+      });
+    return () => {
+      unsubCoco();
+      unsubMn();
+    };
   }, []);
 
   // Cleanup camera stream, live loop, and blob URLs on unmount
@@ -116,7 +137,7 @@ export function WildlifeDetection({
 
   const startDetectionLoop = useCallback(() => {
     if (detectionLoopRef.current) return;
-    if (modelStatus !== 'ready') return;
+    if (detectorStatus !== 'ready') return;
 
     detectionLoopRef.current = setInterval(async () => {
       const video = videoRef.current;
@@ -124,7 +145,7 @@ export function WildlifeDetection({
       if (!video || video.readyState < 2 || !overlay) return;
 
       try {
-        const { animalDetections } = await runWildlifeDetection(video);
+        const { animalDetections } = await runWildlifeDetection(video, { mode: 'live' });
         setLiveDetections(animalDetections);
 
         overlay.width = video.videoWidth || video.clientWidth || 640;
@@ -146,13 +167,13 @@ export function WildlifeDetection({
         // Drop busy frames
       }
     }, 750);
-  }, [modelStatus, soundEnabled, soundVolume]);
+  }, [detectorStatus, soundEnabled, soundVolume]);
 
   useEffect(() => {
-    if (isCameraActive && modelStatus === 'ready' && !detectionLoopRef.current) {
+    if (isCameraActive && detectorStatus === 'ready' && !detectionLoopRef.current) {
       startDetectionLoop();
     }
-  }, [isCameraActive, modelStatus, startDetectionLoop]);
+  }, [isCameraActive, detectorStatus, startDetectionLoop]);
 
   // ── Camera Controls ────────────────────────────────────────────────────────
   const startCamera = async (overrideFacingMode) => {
@@ -196,12 +217,12 @@ export function WildlifeDetection({
         try { await videoRef.current.play(); } catch (e) { console.warn('play() blocked:', e); }
       }
 
-      if (modelStatus === 'ready') startDetectionLoop();
+      if (detectorStatus === 'ready') startDetectionLoop();
 
       setSuccessBanner(
-        modelStatus === 'ready'
-          ? 'Live camera stream started — COCO-SSD real-time vision active.'
-          : 'Live camera stream active — AI vision model initializing…'
+        detectorStatus === 'ready'
+          ? 'Live camera stream started — COCO-SSD bounding boxes active. Capture a frame for species classification.'
+          : 'Live camera stream active — detection model initializing…'
       );
     } catch (err) {
       console.warn('Wildlife camera error:', err);
@@ -353,6 +374,19 @@ export function WildlifeDetection({
     playMildWildlifeChime({ volume: soundVolume, force: true });
   };
 
+  const handleRetryModels = async () => {
+    setModelErrorDetail('');
+    setErrorMessage('');
+    try {
+      await Promise.all([
+        retryLoadMobileNetModel().catch((e) => { throw e; }),
+        retryLoadCocoModel().catch(() => null)
+      ]);
+    } catch (err) {
+      setModelErrorDetail(err.message || 'Model reload failed. Check network connectivity.');
+    }
+  };
+
   // ── Main Wildlife Inference Engine ────────────────────────────────────────
   const runWildlifeInference = async (
     captureCanvas = null,
@@ -362,72 +396,21 @@ export function WildlifeDetection({
     setIsAnalyzing(true);
     setErrorMessage('');
     setSuccessBanner('');
-    setDetectedResult(null); // Clear stale results before starting
+    setDetectedResult(null);
     setCurrentDetections([]);
     if (imageOverlayCanvasRef.current) clearCanvas(imageOverlayCanvasRef.current);
 
     try {
-      // 1. Try FastAPI backend if running with verified custom weights
-      if (selectedFile || capturedDataUrl) {
-        try {
-          const healthRes = await fetch('http://localhost:8000/api/health', { signal: AbortSignal.timeout(1000) });
-          if (healthRes.ok) {
-            const health = await healthRes.json();
-            if (health.models?.yolo_wildlife_loaded) {
-              const formData = new FormData();
-              if (selectedFile) {
-                formData.append('file', selectedFile);
-              } else if (capturedDataUrl) {
-                const parts = capturedDataUrl.split(',');
-                const byteString = atob(parts[1]);
-                const mimeString = parts[0].split(':')[1].split(';')[0];
-                const ab = new ArrayBuffer(byteString.length);
-                const ia = new Uint8Array(ab);
-                for (let i = 0; i < byteString.length; i++) ia[i] = byteString.charCodeAt(i);
-                const blob = new Blob([ab], { type: mimeString });
-                formData.append('file', blob, 'wildlife-capture.jpg');
-              }
-
-              const backendRes = await fetch('http://localhost:8000/api/predict-wildlife', {
-                method: 'POST',
-                body: formData,
-                signal: AbortSignal.timeout(3000)
-              });
-              if (backendRes.ok) {
-                const data = await backendRes.json();
-                const matchedPreset = speciesList.find((s) => s.commonName.toLowerCase() === (data.commonName || '').toLowerCase()) || {
-                  id: 'yolo-detection',
-                  commonName: data.commonName || 'Detected Wildlife',
-                  scientificName: data.scientificName || 'Classified Species',
-                  threatLevel: data.threatLevel || 'Medium',
-                  typicalHabit: data.typicalHabit || 'Boundary movement detected.',
-                  safetyGuidance: data.safetyGuidance || 'Maintain safe perimeter.'
-                };
-
-                await _logWildlifeResult(matchedPreset, data.defaultConfidence || '92%', imgUrl, sourceLabel, false, data.commonName);
-                setIsAnalyzing(false);
-                return;
-              }
-            }
-          }
-        } catch (_) {
-          // Backend offline or no custom weights — proceed to in-browser COCO-SSD
-        }
-      }
-
-      // 2. Load model if not already ready (with proper await so inference isn't called prematurely)
-      let model = null;
       try {
-        model = await loadCocoModel();
+        await loadWildlifeModels();
       } catch (loadErr) {
-        console.error('COCO-SSD load failure:', loadErr);
+        console.error('Wildlife model load failure:', loadErr);
         setDetectedResult(null);
-        setErrorMessage('COCO-SSD model could not be loaded into memory. Check network connectivity and reload the page.');
+        setErrorMessage('Wildlife models could not be loaded. Check your internet connection and retry.');
         setIsAnalyzing(false);
         return;
       }
 
-      // 3. Prepare target element for inference
       let inferenceTarget = null;
       let sourceWidth = 640;
       let sourceHeight = 480;
@@ -455,104 +438,104 @@ export function WildlifeDetection({
         sourceHeight = imgEl.naturalHeight || 480;
       }
 
-      // 4. Run real inference
-      const { animalDetections, otherDetections } = await runWildlifeDetection(inferenceTarget);
+      const {
+        identifiedSpecies,
+        animalDetections,
+        otherDetections,
+        classifications,
+        classifierError
+      } = await runWildlifeDetection(inferenceTarget, { mode: 'full' });
+
       const allDetections = [...animalDetections, ...otherDetections];
       setCurrentDetections(allDetections);
 
-      // 5. Draw real bounding boxes on overlay canvas
       const overlayCanvas = imageOverlayCanvasRef.current;
       if (overlayCanvas) {
         const previewImgEl = imageElRef.current;
         overlayCanvas.width = previewImgEl?.clientWidth || sourceWidth;
         overlayCanvas.height = previewImgEl?.clientHeight || sourceHeight;
         clearCanvas(overlayCanvas);
-
         if (allDetections.length > 0) {
           drawBoundingBoxes(overlayCanvas, allDetections, sourceWidth, sourceHeight);
         }
       }
 
-      // 6. Handle Detection Results Honestly
-      if (animalDetections.length > 0) {
-        const topAnimal = animalDetections[0];
-        const isElephant = topAnimal.cocoClass === 'elephant';
+      if (classifierError && (!identifiedSpecies || identifiedSpecies.isUncertain)) {
+        setErrorMessage('Species classifier could not run. Bounding-box detector may still be available. Retry model load, then analyze again.');
+      }
 
+      if (identifiedSpecies && !identifiedSpecies.isUncertain) {
+        const preset = speciesList.find((s) => s.id === identifiedSpecies.id);
         const resultSpecies = {
-          id: topAnimal.speciesId,
-          commonName: topAnimal.label,
-          scientificName: isElephant ? 'Elephas maximus' : `COCO-SSD Class: ${topAnimal.cocoClass}`,
-          threatLevel: topAnimal.threatLevel,
-          defaultConfidence: topAnimal.confidencePercent,
-          typicalHabit: isElephant
-            ? 'Migratory corridor movement detected near agricultural boundary. High risk to banana/sugarcane.'
-            : `Animal of class "${topAnimal.cocoClass}" detected near crop boundary.`,
-          safetyGuidance: topAnimal.guidance,
-          recommendedActions: isElephant
-            ? [
-                'Maintain strict safe perimeter (> 100 meters)',
-                'Alert neighboring farms and notify village forest committee',
-                'Contact local Forest Department Rapid Response Team (RRT)'
-              ]
-            : [
-                'Inspect perimeter fencing and crop boundary wire',
-                'Confirm species from a safe observation distance',
-                'Log incident in AgroVision event ledger'
-              ],
-          isSupportedAnimal: true
+          id: identifiedSpecies.id,
+          commonName: identifiedSpecies.label,
+          scientificName: identifiedSpecies.scientificName,
+          threatLevel: identifiedSpecies.threatLevel,
+          defaultConfidence: identifiedSpecies.confidencePercent,
+          typicalHabit: preset
+            ? preset.typicalHabit
+            : `Genuine model class: "${identifiedSpecies.imagenetClass || identifiedSpecies.cocoClass || identifiedSpecies.label}".`,
+          safetyGuidance: identifiedSpecies.guidance,
+          recommendedActions: identifiedSpecies.recommendedActions?.length
+            ? identifiedSpecies.recommendedActions
+            : (preset?.recommendedActions || ['Confirm the animal from a safe distance', 'Log the incident if it is near crops']),
+          isSupportedAnimal: true,
+          modelSource: identifiedSpecies.source,
+          rawModelClass: identifiedSpecies.imagenetClass || identifiedSpecies.cocoClass,
+          topScores: (classifications || []).slice(0, 3).map((c) => `${c.className.split(',')[0]} (${(c.probability * 100).toFixed(1)}%)`)
         };
 
         await _logWildlifeResult(
           resultSpecies,
-          topAnimal.confidencePercent,
+          identifiedSpecies.confidencePercent,
           imgUrl,
           sourceLabel,
           false,
-          topAnimal.label
+          identifiedSpecies.label
         );
         return;
       }
 
-      // If no animal was detected, check if non-animal objects (e.g. car, person) were detected
-      if (otherDetections.length > 0) {
+      if (otherDetections.length > 0 && animalDetections.length === 0 && (!classifications?.[0] || classifications[0].probability < 0.28)) {
         const topOther = otherDetections[0];
         setDetectedResult({
           id: `obj-${topOther.cocoClass}`,
-          commonName: `Non-Wildlife Object: ${topOther.label.toUpperCase()}`,
-          scientificName: `Detected Class: "${topOther.cocoClass}"`,
+          commonName: WILDLIFE_UNCERTAIN_MESSAGE,
+          scientificName: `Detector also saw "${topOther.cocoClass}" (${topOther.confidencePercent})`,
           threatLevel: 'None',
           defaultConfidence: topOther.confidencePercent,
-          typicalHabit: `Detected "${topOther.cocoClass}" in field view. No wild animal detected.`,
-          safetyGuidance: 'No wild animal present in this photograph. The detected target is an inanimate object, vehicle, or human.',
+          typicalHabit: `No wildlife class reached a reliable confidence. A non-animal object "${topOther.label}" was localized.`,
+          safetyGuidance: 'No wild animal was confidently identified in this photograph.',
           recommendedActions: [
-            'No wildlife deterrent action required',
-            'Verify camera angle and perimeter boundary view'
+            'Upload a closer photo of the animal',
+            'Verify the camera is pointed at the animal, not background objects'
           ],
+          isUncertain: true,
           isNonWildlife: true
         });
-        setSuccessBanner(`Scanned: Inanimate target "${topOther.label}" detected (${topOther.confidencePercent}). No wildlife threat logged.`);
+        setErrorMessage(WILDLIFE_UNCERTAIN_MESSAGE);
         return;
       }
 
-      // No animal or object detected above threshold (e.g. wild boar / deer which are not in standard COCO-SSD)
+      const topGuess = classifications?.[0];
       setDetectedResult({
         id: 'unidentified',
-        commonName: 'Species could not be identified reliably',
-        scientificName: 'No supported animal detected above confidence threshold',
+        commonName: WILDLIFE_UNCERTAIN_MESSAGE,
+        scientificName: topGuess
+          ? `Top ImageNet class was "${topGuess.className.split(',')[0].trim()}" at ${(topGuess.probability * 100).toFixed(1)}% (below reliable wildlife threshold)`
+          : 'No supported animal class exceeded the confidence threshold',
         threatLevel: 'Low',
-        defaultConfidence: 'Uncertain (< 40%)',
-        typicalHabit: 'The computer vision model could not identify a supported wild animal in this image with sufficient confidence.',
-        safetyGuidance: 'Ensure the animal is clearly visible, centered, and well-lit. Note: Standard COCO-SSD weights support Elephant, Bear, Zebra, Giraffe, Cattle, Sheep, Horse, Canine, Bird. They do not contain custom classes for Wild Boar (Sus scrofa) or Spotted Deer (Axis axis). To recognize those specific species, deploy custom YOLOv8 weights via the backend.',
+        defaultConfidence: topGuess ? `${(topGuess.probability * 100).toFixed(1)}%` : 'Uncertain',
+        typicalHabit: 'The classifier did not produce a reliable wildlife identification for this image.',
+        safetyGuidance: WILDLIFE_UNCERTAIN_MESSAGE,
         recommendedActions: [
           'Upload a clearer, well-lit photo showing the entire animal',
-          'Deploy custom wildlife weights (yolov8n_wildlife.pt) via the AgroVision backend'
+          'Fill most of the frame with the animal and avoid heavy blur'
         ],
-        isUncertain: true
+        isUncertain: true,
+        topScores: (classifications || []).slice(0, 3).map((c) => `${c.className.split(',')[0]} (${(c.probability * 100).toFixed(1)}%)`)
       });
-
-      setErrorMessage(
-        'Species could not be identified reliably. COCO-SSD detected no supported wildlife with high confidence. Note: Standard COCO-SSD does not contain classes for Wild Boar or Spotted Deer.'
-      );
+      setErrorMessage(WILDLIFE_UNCERTAIN_MESSAGE);
     } catch (err) {
       console.warn('Wildlife inference error:', err);
       setDetectedResult(null);
@@ -587,6 +570,36 @@ export function WildlifeDetection({
 
     // ONLY save real supported animal detections to the incident history ledger (NEVER save non-wildlife or presets)
     if (speciesData.threatLevel !== 'None' && !speciesData.isNonWildlife && !speciesData.isUncertain && !speciesData.isPresetReference) {
+      // Create persistent thumbnail data URL so uploaded/captured photo persists across page reloads
+      let persistentThumb = imgUrl;
+      try {
+        if (imgUrl && imgUrl.startsWith('blob:') && imageElRef.current) {
+          const thumbCanvas = document.createElement('canvas');
+          const maxDim = 200;
+          let w = imageElRef.current.naturalWidth || 200;
+          let h = imageElRef.current.naturalHeight || 200;
+          if (w > maxDim || h > maxDim) {
+            if (w > h) {
+              h = Math.round((h * maxDim) / w);
+              w = maxDim;
+            } else {
+              w = Math.round((w * maxDim) / h);
+              h = maxDim;
+            }
+          }
+          thumbCanvas.width = w;
+          thumbCanvas.height = h;
+          const ctx = thumbCanvas.getContext('2d');
+          ctx.drawImage(imageElRef.current, 0, 0, w, h);
+          persistentThumb = thumbCanvas.toDataURL('image/jpeg', 0.82);
+        }
+      } catch (_) {
+        persistentThumb = getWildlifeSpeciesImage(speciesData.commonName);
+      }
+      if (!persistentThumb || persistentThumb.startsWith('blob:')) {
+        persistentThumb = getWildlifeSpeciesImage(speciesData.commonName);
+      }
+
       const newEvent = {
         id: `WLD-${Math.floor(1000 + Math.random() * 9000)}`,
         species: `${speciesData.commonName} (${speciesData.scientificName})`,
@@ -598,7 +611,7 @@ export function WildlifeDetection({
         status: 'Verified',
         threatLevel: speciesData.threatLevel,
         isDemo: false,
-        thumbnail: imgUrl,
+        thumbnail: persistentThumb,
         notes: speciesData.typicalHabit
       };
 
@@ -694,18 +707,28 @@ export function WildlifeDetection({
               }`}
             />
             <span>
-              <strong>Wildlife AI Vision Engine (COCO-SSD):</strong>&nbsp;
-              {modelStatus === 'idle' && 'Initializing TensorFlow.js COCO-SSD object detector…'}
-              {modelStatus === 'loading' && 'Loading COCO-SSD model weights into browser…'}
-              {modelStatus === 'ready' && 'Model Ready — Real client-side object detection active'}
-              {modelStatus === 'error' && 'Model load failed — check network connectivity and reload'}
+              <strong>Wildlife AI Vision Engine:</strong>&nbsp;
+              {modelStatus === 'loading' && 'Loading MobileNet classifier and COCO-SSD detector…'}
+              {modelStatus === 'ready' && (
+                <>
+                  Classifier {classifierStatus === 'ready' ? 'ready' : classifierStatus}
+                  {' • '}
+                  Detector {detectorStatus === 'ready' ? 'ready' : detectorStatus}
+                </>
+              )}
+              {modelStatus === 'error' && (modelErrorDetail || 'Model load failed — check network connectivity and retry')}
             </span>
           </div>
           <span className="disclaimer-chip">
             {modelStatus === 'loading' && <><Icon name="refresh" size={13} className="spin" /> Loading…</>}
-            {modelStatus === 'ready' && 'COCO-SSD TF.js • Live Bounding Boxes'}
+            {modelStatus === 'ready' && 'MobileNet ImageNet • COCO-SSD boxes'}
             {modelStatus === 'error' && 'Model Offline'}
           </span>
+          {modelStatus === 'error' && (
+            <button type="button" className="btn btn-outline btn-xs" onClick={handleRetryModels} style={{ marginLeft: 8 }}>
+              Retry load
+            </button>
+          )}
         </div>
 
         {/* Audio Alert Controls Toolbar */}
@@ -857,7 +880,7 @@ export function WildlifeDetection({
                 />
                 <div className="camera-overlay-reticle">
                   <span className="cam-hud-label">
-                    {modelStatus === 'ready' ? 'COCO-SSD LIVE DETECTION' : 'PERIMETER SURVEILLANCE'}
+                    {detectorStatus === 'ready' ? 'LIVE BOUNDING BOXES' : 'PERIMETER SURVEILLANCE'}
                   </span>
                   {liveDetections.length > 0 && (
                     <span style={{ color: '#ef4444', fontWeight: 700, marginLeft: 10 }}>
@@ -924,7 +947,7 @@ export function WildlifeDetection({
                   {isAnalyzing && (
                     <div className="analyzing-backdrop">
                       <Icon name="refresh" size={28} className="spin" color="#ffffff" />
-                      <p>Running COCO-SSD Object Detection…</p>
+                      <p>Identifying animal… running MobileNet + COCO-SSD</p>
                     </div>
                   )}
                 </div>
@@ -1011,9 +1034,9 @@ export function WildlifeDetection({
                   >
                     <Icon name="scan" size={16} />
                     {isAnalyzing
-                      ? 'Analyzing Image…'
+                      ? 'Identifying Animal…'
                       : inputSource === 'preset'
-                      ? 'Analyze Preset with COCO-SSD'
+                      ? 'Analyze Preset Photo'
                       : 'Analyze Animal'}
                   </button>
 
@@ -1025,7 +1048,7 @@ export function WildlifeDetection({
                         setSelectedFile(null);
                         setCapturedDataUrl(null);
                         setActivePreset(null);
-                        setPreviewImage('/images/wildlife-placeholder.jpg');
+                        setPreviewImage(DEFAULT_WILDLIFE_IMAGE);
                         setInputSource('idle');
                         setDetectedResult(null);
                         setCurrentDetections([]);
@@ -1118,7 +1141,7 @@ export function WildlifeDetection({
                   <div className="demo-mode-notice" style={{ margin: '12px 0', borderColor: '#16a34a' }}>
                     <Icon name="shield" size={16} color="#16a34a" />
                     <span>
-                      <strong>Educational Knowledge Base Entry:</strong> This is a reference wildlife profile from the AgroVision database detailing typical habits and non-lethal deterrent methods. Click <strong>"Analyze Preset with COCO-SSD"</strong> to execute real vision inference on this photo.
+                      <strong>Educational Knowledge Base Entry:</strong> This is a reference wildlife profile from the AgroVision database detailing typical habits and non-lethal deterrent methods. Click <strong>"Analyze Preset Photo"</strong> to run real model inference on this photo.
                     </span>
                   </div>
                 )}
@@ -1127,10 +1150,21 @@ export function WildlifeDetection({
                   <div className="demo-mode-notice" style={{ margin: '12px 0', borderColor: '#0284c7' }}>
                     <Icon name="info" size={16} color="#0284c7" />
                     <span>
-                      <strong>Real COCO-SSD Inference Active:</strong> Real-time neural object detection executed. Bounding boxes are drawn to actual detected object coordinates.
+                      <strong>Real model inference:</strong> Species name and confidence come from MobileNet (ImageNet). Boxes, if shown, come from COCO-SSD. Raw class: {detectedResult.rawModelClass || detectedResult.commonName}.
+                      {detectedResult.topScores?.length ? (
+                        <>
+                          {' '}Top scores: {detectedResult.topScores.join(' · ')}
+                        </>
+                      ) : null}
                     </span>
                   </div>
                 )}
+                {detectedResult.isUncertain && detectedResult.topScores?.length ? (
+                  <div className="demo-mode-notice" style={{ margin: '12px 0', borderColor: '#d97706' }}>
+                    <Icon name="info" size={16} color="#d97706" />
+                    <span>Highest model scores (not used as a final ID): {detectedResult.topScores.join(' · ')}</span>
+                  </div>
+                ) : null}
 
                 {/* Ecological Habit & Safety */}
                 <div className="sp-sections-stack">
@@ -1173,10 +1207,12 @@ export function WildlifeDetection({
                   Click a reference species above to review safety protocols, or open live camera / upload a field photograph, then click <strong>"Analyze Animal"</strong>.
                 </p>
                 <div className="empty-tips-box">
-                  <strong>Vision Model Coverage (COCO-SSD):</strong>
+                  <strong>Vision model coverage:</strong>
                   <ul>
-                    <li>Directly detects: Elephants, Bears, Ungulates, Livestock (Cattle/Sheep/Horses), Stray Canines, Birds</li>
-                    <li>For custom Wild Boar or Spotted Deer classifiers, deploy the custom YOLOv8 model weights via the backend</li>
+                    {WILDLIFE_MODEL_COVERAGE.classifierSupports.map((item) => (
+                      <li key={item}>{item}</li>
+                    ))}
+                    <li>Not a named class: {WILDLIFE_MODEL_COVERAGE.notSupportedAsNamedClasses[0]}</li>
                   </ul>
                 </div>
               </div>

@@ -23,4 +23,6 @@ dist-ssr
 *.sln
 *.sw?
 *.zip
+scratch/
+test-runner.html
 AGROVISION_CODEBASE_FOR_GPT.md

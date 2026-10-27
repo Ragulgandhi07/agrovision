@@ -1,3 +1,5 @@
+import { getAssetUrl, getWildlifeSpeciesImage } from './imageFallbacks';
+
 // Storage and Data Management Utility for AgroVision
 // Handles local storage persistence for detection history, farmer profile, alerts, and settings
 
@@ -20,7 +22,7 @@ const INITIAL_CROP_SCANS = [
     timestamp: '2026-10-14 08:30:10',
     isDemo: true,
     status: 'Action Recommended',
-    image: '/images/crop-early-blight.jpg',
+    image: getAssetUrl('images/crop-early-blight.jpg'),
     treatment: 'Apply neem seed kernel extract (5%) or copper oxychloride. Prune lower diseased foliage.'
   },
   {
@@ -32,7 +34,7 @@ const INITIAL_CROP_SCANS = [
     timestamp: '2026-10-13 14:10:45',
     isDemo: true,
     status: 'Healthy',
-    image: '/images/crop-healthy-paddy.jpg',
+    image: getAssetUrl('images/crop-healthy-paddy.jpg'),
     treatment: 'Maintain current water depth (2-3cm) during panicle initiation.'
   },
   {
@@ -44,7 +46,7 @@ const INITIAL_CROP_SCANS = [
     timestamp: '2026-10-12 11:40:20',
     isDemo: true,
     status: 'Action Required',
-    image: '/images/crop-late-blight.jpg',
+    image: getAssetUrl('images/crop-late-blight.jpg'),
     treatment: 'Ensure furrow drainage. Spray Mancozeb 75% WP under agronomist guidance.'
   }
 ];
@@ -105,7 +107,7 @@ const INITIAL_NOTIFICATIONS = [
 /**
  * Wildlife History Storage
  * Strictly returns genuine user detections.
- * Purges legacy mock/demo entries (e.g. WLD-8041, WLD-8039, WLD-8035, fake 94.2% scores).
+ * Purges legacy mock/demo entries and sanitizes expired blob URLs.
  */
 export function getWildlifeHistory() {
   if (typeof window === 'undefined') return [];
@@ -123,16 +125,31 @@ export function getWildlifeHistory() {
 
     // Purge outdated, fake, demo, or duplicate mock records
     const legacyMockIds = new Set(['WLD-8041', 'WLD-8039', 'WLD-8035']);
-    const sanitized = parsed.filter((item) => {
-      if (!item || typeof item !== 'object') return false;
-      if (item.isDemo) return false;
-      if (legacyMockIds.has(item.id)) return false;
-      // Discard records with fake placeholder data
-      if (item.speciesCommon === 'Wild Boar' && item.confidence === '94.2%') return false;
-      return true;
-    });
+    let hasChanges = false;
 
-    if (sanitized.length !== parsed.length) {
+    const sanitized = parsed
+      .filter((item) => {
+        if (!item || typeof item !== 'object') return false;
+        if (item.isDemo) return false;
+        if (legacyMockIds.has(item.id)) return false;
+        // Discard records with fake placeholder data
+        if (item.speciesCommon === 'Wild Boar' && (item.confidence === '94.2%' || item.confidence?.includes('94%'))) return false;
+        if (item.source === 'Preset Specimen') return false;
+        return true;
+      })
+      .map((item) => {
+        // If thumbnail is an expired/dead blob URL or empty, replace with reliable species image
+        if (!item.thumbnail || item.thumbnail.startsWith('blob:')) {
+          hasChanges = true;
+          return {
+            ...item,
+            thumbnail: getWildlifeSpeciesImage(item.speciesCommon || item.species)
+          };
+        }
+        return item;
+      });
+
+    if (hasChanges || sanitized.length !== parsed.length) {
       localStorage.setItem(STORAGE_KEYS.WILDLIFE_HISTORY, JSON.stringify(sanitized));
     }
     return sanitized;
@@ -145,7 +162,19 @@ export function getWildlifeHistory() {
 export function saveWildlifeEvent(event) {
   if (!event) return getWildlifeHistory();
   const current = getWildlifeHistory();
-  const updated = [event, ...current];
+  
+  // Ensure thumbnail is persistent (if blob URL, fallback to species image so it doesn't break on reload)
+  let safeThumbnail = event.thumbnail;
+  if (!safeThumbnail || safeThumbnail.startsWith('blob:')) {
+    safeThumbnail = getWildlifeSpeciesImage(event.speciesCommon || event.species);
+  }
+
+  const persistentEvent = {
+    ...event,
+    thumbnail: safeThumbnail
+  };
+
+  const updated = [persistentEvent, ...current];
   localStorage.setItem(STORAGE_KEYS.WILDLIFE_HISTORY, JSON.stringify(updated));
   return updated;
 }
